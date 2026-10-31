@@ -34,6 +34,20 @@ describe("humanModelError", () => {
     }
   });
 
+  // THE STATUS THE MAP FORGOT. A 404 from an OpenAI-compatible provider means the model id is
+  // not available to this key: a retired model, or one moved off a free tier, which is a thing
+  // vendors do on their own schedule. It fell through to "could not read that. Try again",
+  // which blames the cook's input for a configuration fault and offers advice that cannot
+  // work. Found by walking the AI import on 2026-10-31, when OpenRouter did exactly that to
+  // the model the local env named.
+  it("says a missing model is not the cook's fault either", () => {
+    expect(humanModelError(404)).toMatch(/not your fault/i);
+    expect(humanModelError(404)).toMatch(/not available/i);
+    expect(humanModelError(404)).not.toMatch(/could not read that/i);
+    // No "try again": retrying a model that does not exist is a loop.
+    expect(humanModelError(404)).not.toMatch(/try again/i);
+  });
+
   it("has a sane answer for an unexpected status", () => {
     expect(humanModelError(418)).toMatch(/could not read that/i);
   });

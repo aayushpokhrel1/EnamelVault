@@ -22,13 +22,26 @@ export default function AiPrefillPanel({ onDraft }: { onDraft: (draft: RecipeDra
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A SUCCESSFUL EXTRACTION THAT FOUND NOTHING IS NOT AN ERROR, and until 2026-10-31 it was
+  // not anything else either. The function answers 200 with a draft whose ingredients and
+  // steps are empty whenever the model reads a page and finds no recipe in it, which a real
+  // URL does often: a wiki page of prose, a blog post that buries the recipe behind a script,
+  // a photo of the wrong side of the card. The cook saw the button go back to "Extract", one
+  // field quietly change, and nothing else. Found by pasting a public wiki page while walking
+  // the import, where the reply was {"title":"Pancakes","ingredients":[],"steps":[]}.
+  //
+  // It is NOT an error state: what came back is kept (a title is worth having) and the form is
+  // perfectly usable by hand, so this says what happened rather than colouring it red.
+  const [thin, setThin] = useState(false);
 
   async function run(m: Mode, payload: string) {
     setError(null);
+    setThin(false);
     setLoading(true);
     try {
       const draft = await extractRecipe(m, payload);
       onDraft(draft);
+      setThin(draft.ingredients.length === 0 && draft.steps.length === 0);
     } catch (err) {
       reportError(`extract:${m}`, err);
       setError(err instanceof Error ? err.message : String(err));
@@ -137,6 +150,12 @@ export default function AiPrefillPanel({ onDraft }: { onDraft: (draft: RecipeDra
       )}
       {recording && <p>Recording… tap Stop when done.</p>}
       {loading && <p>Extracting…</p>}
+      {thin && !loading && !error && (
+        <p role="status" className="vault-note">
+          The assistant read that but found no ingredients or steps in it. Anything it did find
+          is below; the rest is yours to type in.
+        </p>
+      )}
       {(error ?? recorderError) && <p role="alert">{error ?? recorderError}</p>}
     </div>
   );

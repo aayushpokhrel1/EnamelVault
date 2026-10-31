@@ -150,3 +150,45 @@ test("a failed save reports itself once, with the context that says where", asyn
   vi.doUnmock("../lib/api/recipes");
   vi.doUnmock("../lib/api/tags");
 });
+
+// A SUCCESSFUL EXTRACTION THAT FOUND NOTHING SAID NOTHING.
+//
+// The function answers 200 with empty ingredients and steps whenever the model reads something
+// and finds no recipe in it, which a real URL does often. The panel treated that as success,
+// which it is, and showed nothing, which left the cook watching the button go back to "Extract"
+// with no idea whether anything had happened. Found by pasting a public wiki page while walking
+// the import on 2026-10-31: the reply was {"title":"Pancakes","ingredients":[],"steps":[]}.
+test("says so when the assistant read something and found no recipe in it", async () => {
+  vi.doMock("../lib/api/recipes", () => ({
+    createRecipe: vi.fn(),
+    listFamilyIngredientNames: vi.fn().mockResolvedValue([]),
+    listFamilySectionNames: vi.fn().mockResolvedValue([]),
+  }));
+  vi.doMock("../lib/api/tags", () => ({ setRecipeTags: vi.fn(), listTags: vi.fn().mockResolvedValue([]) }));
+  vi.doMock("../lib/api/extract", () => ({
+    extractRecipe: vi.fn().mockResolvedValue({
+      title: "Pancakes", story: "", provenance: "", servings: null,
+      prep_minutes: null, cook_minutes: null,
+      source_url: "https://example.com/pancakes",
+      ingredients: [],
+      steps: [],
+    }),
+  }));
+
+  vi.resetModules();
+  const { default: Page } = await import("./RecipeCreate");
+  render(<MemoryRouter><Page /></MemoryRouter>);
+
+  fireEvent.change(screen.getByLabelText(/recipe text/i), {
+    target: { value: "a page with no recipe on it" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: /^extract$/i }));
+
+  expect(await screen.findByText(/found no ingredients or steps/i)).toBeInTheDocument();
+  // Not an error: what it DID find is kept, and the form is still usable by hand.
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect((screen.getByPlaceholderText(/^Title$/) as HTMLInputElement).value).toBe("Pancakes");
+  vi.doUnmock("../lib/api/extract");
+  vi.doUnmock("../lib/api/recipes");
+  vi.doUnmock("../lib/api/tags");
+});
