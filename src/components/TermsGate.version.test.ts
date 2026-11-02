@@ -11,7 +11,7 @@ import { fingerprint, prose, sourceText } from "../lib/termsFingerprint";
 // failure mode is not ignorance, it is not re-reading. So this test fingerprints the prose and
 // fails when the prose moved and the version did not.
 //
-// WHEN IT FAILS: bump TERMS_VERSION in TermsGate.tsx, bump TERMS_UPDATED in lib/legal.ts, and
+// WHEN IT FAILS: bump TERMS_VERSION and TERMS_UPDATED, which both live in lib/legal.ts, and
 // paste the hash the failure message prints into EXPECTED below. Three edits, one of which the
 // failure hands you. That is deliberately slightly annoying: a terms change should cost a
 // moment's thought, because it re-prompts every existing user.
@@ -23,12 +23,12 @@ it("re-prompts every user when the terms wording changes", () => {
   const actual = fingerprint(prose(sourceText("src/pages/Terms.tsx")));
   expect(
     actual,
-    `Terms.tsx changed. Bump TERMS_VERSION in TermsGate.tsx and TERMS_UPDATED in lib/legal.ts, then set EXPECTED in this test to "${actual}".`,
+    `Terms.tsx changed. Bump TERMS_VERSION and TERMS_UPDATED in lib/legal.ts, then set EXPECTED in this test to "${actual}".`,
   ).toBe(EXPECTED);
 });
 
 it("keeps the three places that record a terms change in step", () => {
-  const version = /TERMS_VERSION = "([^"]+)"/.exec(sourceText("src/components/TermsGate.tsx"))?.[1];
+  const version = /TERMS_VERSION = "([^"]+)"/.exec(sourceText("src/lib/legal.ts"))?.[1];
   const updated = /TERMS_UPDATED = "([^"]+)"/.exec(sourceText("src/lib/legal.ts"))?.[1];
   expect(version, "TERMS_VERSION must be an ISO date, so it sorts and is comparable").toMatch(
     /^\d{4}-\d{2}-\d{2}$/,

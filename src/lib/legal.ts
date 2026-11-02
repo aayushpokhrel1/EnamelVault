@@ -10,10 +10,22 @@ export const OPERATOR = "Aayush Pokhrel";
 export const CONTACT_EMAIL = "moderation@enamelvault.com";
 
 // Shown on each policy page. BUMP THE DATE WHEN YOU CHANGE THAT PAGE'S WORDING, and if you
-// change Terms.tsx, bump TERMS_VERSION in TermsGate.tsx as well so people are re-asked.
+// change Terms.tsx, bump TERMS_VERSION just below as well so people are re-asked.
 export const PRIVACY_UPDATED = "26 October 2026";
 export const COOKIES_UPDATED = "26 October 2026";
 export const TERMS_UPDATED = "11 October 2026";
+
+// The version the gate stores against an acceptance, and the date above, describe the same
+// change, so they live together: this constant used to sit in TermsGate.tsx, a file the phone
+// app may not import, and a copy of a consent version is a copy that drifts. THREE apps read
+// this now (the web gate, the phone gate, and TermsGate.version.test.ts), which is also why
+// this file must stay free of imports: the mobile seal allows it only while it is constants.
+//
+// BUMP IT WHENEVER THE WORDING IN Terms.tsx CHANGES, together with TERMS_UPDATED above. An
+// edit shipped without a bump means nobody is re-asked and the stored terms_accepted_at
+// claims people accepted text they never saw. TermsGate.version.test.ts holds that
+// mechanically rather than trusting this comment.
+export const TERMS_VERSION = "2026-10-11";
 
 // The PROFESSIONAL KITCHEN app's documents, dated separately from the family app's above.
 // Separate on purpose rather than by oversight: they are a different product with different

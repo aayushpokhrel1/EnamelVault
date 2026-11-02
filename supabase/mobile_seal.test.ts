@@ -33,7 +33,11 @@ const resolveImport = (fromFile: string, spec: string): string | null => {
 // ingredientCategories is NOT on this list, and the test below is how that was discovered
 // rather than assumed: it imports supabaseClient, so it is a data module wearing a helper's
 // name. A list of "pure helpers" nobody checks is a list of guesses.
-const ALLOWED_FROM_MOBILE = /\/lib\/api\/(types|normalizeItem|quantity|units|primaryIngredients)$/;
+// lib/legal is allowed because it is CONSTANTS ONLY, and the test below holds it to that.
+// TERMS_VERSION lives there so the phone gate compares against the same value the web gate
+// does: a copy of a consent version is a copy that drifts, and the version is the only
+// evidence of what somebody actually agreed to.
+const ALLOWED_FROM_MOBILE = /(\/lib\/api\/(types|normalizeItem|quantity|units|primaryIngredients)|\/lib\/legal)$/;
 
 it("no module under src/mobile imports react-native or expo", () => {
   const offenders: string[] = [];
@@ -69,6 +73,7 @@ it("the helpers src/mobile is allowed to import touch no client", () => {
     "src/lib/api/quantity.ts",
     "src/lib/api/units.ts",
     "src/lib/api/primaryIngredients.ts",
+    "src/lib/legal.ts",
   ];
   
   for (const helper of helpers) {
@@ -81,6 +86,14 @@ it("the helpers src/mobile is allowed to import touch no client", () => {
     }
   }
   expect(offenders).toEqual([]);
+});
+
+it("lib/legal is constants only, which is the whole reason it may be imported", () => {
+  // The allowance above rests on this file having no imports at all. The moment it gains
+  // one, "constants only" is a claim rather than a fact, and the phone core has a path into
+  // the web app through a file nobody thinks of as code.
+  const text = readFileSync("src/lib/legal.ts", "utf8");
+  expect([...text.matchAll(/^\s*(?:import|export)[^;]*?from\s+"([^"]+)"/gm)].map((m) => m[1])).toEqual([]);
 });
 
 it("the phone app imports no web app page or component", () => {
@@ -136,5 +149,47 @@ it("follows transitive imports, so a shared module cannot smuggle a client in", 
     }
   }
   
+  expect(offenders).toEqual([]);
+});
+
+/**
+ * The phone app's router guard, and the reason it is HERE rather than under `mobile/`:
+ * `npm test` runs `vitest run src supabase worker scripts`, so a test living beside the app
+ * it guards would never run. This repo has already learned that a guard covering one of
+ * several routers reports success for the app it cannot see, which is how the kitchen app
+ * shipped its entire surface ungated with the suite green.
+ *
+ * expo-router is file-based, so there is no route list to read the way
+ * `src/routes.terms.test.ts` reads the family router. The equivalent invariant is
+ * structural: the only <Stack> in the app is in `_layout.tsx`, and it is inside <Gate>.
+ * Nothing can escape a gate it is never rendered outside of.
+ */
+const appFiles = () => sourceFiles("mobile/app").map((file) => file.split(sep).join("/"));
+
+// Comments are stripped FIRST, and the first version of this guard is why: the comment in
+// _layout.tsx explaining the rule mentions <Stack> and <Gate>, so the test read its own
+// documentation as code and failed on a file that was correct. A guard that cannot tell a
+// comment from a component cannot tell anything.
+const code = (file: string): string =>
+  readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+it("the only router in the phone app is the one inside the gate", () => {
+  const withStack = appFiles().filter((file) => /<Stack[\s/>]/.test(code(file)));
+  expect(withStack).toEqual(["mobile/app/_layout.tsx"]);
+});
+
+it("the router is rendered inside <Gate>, and nothing else is", () => {
+  const layout = code("mobile/app/_layout.tsx");
+  const gate = layout.indexOf("<Gate>");
+  const close = layout.indexOf("</Gate>");
+  const stack = layout.search(/<Stack[\s/>]/);
+  expect(gate, "_layout.tsx must render <Gate>").toBeGreaterThan(-1);
+  expect(stack > gate && stack < close, "<Stack> must sit between <Gate> and </Gate>").toBe(true);
+});
+
+it("no screen reaches the client directly, so nothing can act before the gate has", () => {
+  // A screen holding its own supabase import could fetch, write or sign out from outside the
+  // store the gate handed it, which is the account boundary with an extra door in it.
+  const offenders = appFiles().filter((file) => /from\s+"[^"]*\/supabase"/.test(code(file)));
   expect(offenders).toEqual([]);
 });

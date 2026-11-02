@@ -5,7 +5,7 @@ import { CONTACT_EMAIL, OPERATOR, TERMS_UPDATED } from "../lib/legal";
 // than a short one people might. Aayush owns the wording; this is a starting draft, and the
 // contact address is the one thing here that MUST be kept true.
 //
-// CHANGING THE WORDING BELOW? Bump TERMS_VERSION in TermsGate.tsx and TERMS_UPDATED in
+// CHANGING THE WORDING BELOW? Bump TERMS_VERSION and TERMS_UPDATED, both in
 // lib/legal.ts, or people are never re-asked and the stored acceptance claims they agreed to
 // text they never saw. src/components/TermsGate.version.test.ts now FAILS if you forget.
 //
