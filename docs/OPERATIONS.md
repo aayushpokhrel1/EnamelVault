@@ -1654,22 +1654,6 @@ with the query in this repo's history (`6c73667`).
 
 ### Known standing risks
 
-- **A KITCHEN VISIT RECORDED WEST OF UTC IN THE EVENING DOES NOT COUNT, for a member who
-  joined today.** `kitchen.activity_days.day` is the CLIENT's local date, and the write side
-  tolerates that on purpose: both the check constraint and `record_kitchen_visit` accept
-  `current_date - 1 .. current_date + 1` because "a day either side covers every real timezone
-  offset" (`0060`). The READ side in `0065` does not: `people()` counts
-  `ad.day > current_date - of_days`, and `of_days` has a floor of 1, so for somebody who joined
-  today the window is "strictly after yesterday" and a row stamped with the client's local
-  yesterday is dropped. **The owner then sees that person as never having arrived.** Wider
-  windows are unaffected, because a seven-day window already reaches past the skew.
-  Reproducible on demand rather than theoretical: `tests/integration/kitchen_numbers.test.ts`,
-  "a visit today counts once however many surfaces were opened", fails on any machine whose
-  local date is behind the database's UTC date, which here means every evening after 19:00
-  local. It survives `npx supabase db reset`, so it is not the browser-walk residue that the
-  triage above is about. **The fix is the read window, not the test**: it has to tolerate the
-  same day either side the writer was designed to accept. That needs a migration of its own.
-
 - **A FAMILY INVITE CODE CANNOT BE REVOKED FROM THE APP, and it never expires.** Every member
   sees the code on `/families` with a Copy button, `families_member_read` is what shows it to
   them, and `family_name_for_code` names the family to anyone holding it before they sign in.
