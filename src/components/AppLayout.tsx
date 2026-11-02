@@ -43,8 +43,9 @@ export default function AppLayout() {
     rest.delete("from");
     setParams(rest, { replace: true });
   }, [params, setParams]);
-  // The link is the ONLY way to reach /moderation: the route has no entry point anywhere
-  // else, so before this a moderator had to remember the URL to find their own queue.
+  // The link is the ONLY way to reach the console: it lives on admin.enamelvault.com (see
+  // ADMIN_ORIGIN) and is linked from nowhere else, so without this a moderator would have to
+  // remember another host to find their own queue.
   //
   // This is a CONVENIENCE, not a permission. Hiding a link protects nothing, and the real
   // guard is elsewhere and stays there: the page re-checks is_moderator, and the report rows

@@ -12,7 +12,6 @@ Disallow: /settings
 Disallow: /kitchen
 Disallow: /drafts
 Disallow: /families
-Disallow: /moderation
 Disallow: /potluck
 Disallow: /me
 Disallow: /join/

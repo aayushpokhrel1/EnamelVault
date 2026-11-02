@@ -43,7 +43,8 @@ vault (`Projects/FamilyRecipes/`), which spans every project. See `CLAUDE.md`.
   awake, and the step itself is the tap target because cooking hands are rarely clean. The
   ingredients that step mentions sit under it with the amounts already scaled, the full list
   sits beside the step rather than on top of it, you can tick an ingredient off as you add it,
-  and the step number is in the URL so a reload does not lose your place.
+  and the step number is in the URL so a reload does not lose your place. It can also read the
+  step and its scaled amounts aloud, off by default and toggled in the bar.
 - **Potluck**: a signed-in space for other households' public recipes, with search, a public
   cook page per handle, and following. Saving a copy into your own vault keeps the original
   cook's attribution, and the copy survives the original being unpublished or deleted.
@@ -54,14 +55,15 @@ vault (`Projects/FamilyRecipes/`), which spans every project. See `CLAUDE.md`.
   Add staples by typing or from the ingredient catalog, and tag an aisle for anything the
   catalog cannot place, from whichever screen you noticed it on.
 - **Sign-in** with a verified email address or with Google.
-- **Moderator console** at `/moderation`, in five sections: the report queue, appeals, a
-  **Recipes** section of counts and first-party numbers (who comes back, where people fall out
-  of onboarding, which features are used, which marketing page produced an account), a roster
-  with suspend, take down, grant moderator and delete, and a **Kitchen** section that counts the
-  other product and reports its throughput (dishes started and signed off, the median days to
-  sign-off, how many have been in development over a month, and how many staff were active in
-  the last seven days, as a count that never names anybody). Visible only to a moderator, and the page re-checks that rather than relying
-  on the nav hiding the link.
+- **Moderator console** on its own host, `admin.enamelvault.com`, in six sections: the report
+  queue, appeals, a **Recipes** section of counts and first-party numbers (who comes back, where
+  people fall out of onboarding, which features are used, which marketing page produced an
+  account), a **People** roster with suspend, take down, grant moderator and delete, a
+  **Kitchen** section that counts the other product and reports its throughput (dishes started
+  and signed off, the median days to sign-off, how many have been in development over a month,
+  and how many staff were active in the last seven days, as a count that never names anybody),
+  and a **Trail** of every moderator action with its author. Visible only to a moderator, and
+  the page re-checks that rather than relying on the nav hiding the link.
 - **Public documents**, readable without an account: terms, privacy policy, cookies, and help
   (`/terms`, `/privacy`, `/cookies`, `/help`). The kitchen app has its own `/terms` and
   `/privacy`, a different product with different parties, and its own acceptance gate. There is no cookie banner because the only cookie the app sets is the one that keeps you
@@ -140,7 +142,10 @@ Full setup, environment variables and the verify commands are in
 
 ## Roadmap
 
-Shipped, newest first: the public documents and the WCAG AA contrast and labelling fixes ·
+Shipped, newest first: one sign-in across all three hosts, and the moderation console moved
+to its own host with its own door · an audit trail naming the author of every moderator
+action · Cook Mode reading the step aloud · the public documents and the WCAG AA contrast and
+labelling fixes ·
 search-engine indexing (robots, sitemap, canonical, JSON-LD) · moderation, reporting and
 takedown · save and fork with attribution · Potluck, the public feed (browse, search, follow) · public identity and
 public cook pages · optional ingredients and alternatives · week-grid drag and drop · error

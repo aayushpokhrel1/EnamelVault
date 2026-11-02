@@ -752,6 +752,22 @@ that fell back would spend a request earning a 400 and then report that instead 
 reason the first provider failed. DeepSeek has no vision, so with a DeepSeek fallback you
 leave this unset and photos simply do not fall back.
 
+**A provider retiring a model id is a state to expect, and it used to blame the cook.** An
+OpenAI-compatible provider answers 404 when the key cannot have the model named in
+`MODEL_NAME`, which is what happens when a slug is retired or moved off a free tier. Until
+2026-10-31 that fell through to "could not read that. Try again", so a configuration fault told
+every cook their own perfectly good recipe was unreadable, advice that could never work.
+`supabase/functions/extract-recipe/errors.ts` now has a 404 branch naming the model, and the
+message a cook reports therefore identifies the fault class: 429 is the provider's limit,
+502/503/504 busy, 401/403 the key, 404 the model id, anything else genuinely unreadable input.
+**The local `supabase/functions/.env` drifts the same way and more often**, since it names free
+slugs; a local 429 is usually the shared free pool rather than a bug.
+
+**`/health/extract` cannot see any of this.** It sends an OPTIONS preflight, which the function
+answers above its auth check, so it proves the isolate boots and nothing about the model path. A
+wrong `MODEL_NAME`, an expired key or a provider outage all leave it green. Only a real import by
+a signed-in cook closes that loop.
+
 **The provider's error body never reaches the browser.** It goes to the function logs
 (`npx supabase functions logs extract-recipe`), and the cook sees wording plus a way out. If
 someone reports "the recipe assistant is busy", the real status is in those logs.
@@ -944,14 +960,13 @@ the queries are reconstructible from the tables listed above.
 
   406 means the schema is not exposed. 401 means it is exposed and the grants are doing their
   job. The publishable key is public by design and can be read out of the deployed bundle.
-- **The redirect allow list can only be checked by reading the dashboard.** The obvious probe
-  does not work: `GET /auth/v1/authorize?provider=google&redirect_to=...` echoes ANY value back
-  in its 302 to the provider, including a deliberately bogus control, because the allow list is
-  enforced later at Supabase's own `/auth/v1/callback`. The `state` is an opaque UUID, not a
-  decodable JWT, so nothing in the response reveals which redirect was accepted. A probe that
-  returns the same answer for a known-bad input is measuring nothing; run the bogus control
-  before trusting any such check. The kitchen host's entries were confirmed this way on
-  2026-10-15, by reading the dashboard, after the probe proved useless.
+- **The redirect allow list can only be checked by reading the dashboard**, or by completing a
+  real sign-in; "You cannot prove an allow-list entry from `/auth/v1/authorize`" above has why,
+  and the `state` is an opaque UUID so nothing in the response reveals which redirect was
+  accepted either. The kitchen host's entries were confirmed by reading the dashboard on
+  2026-10-15, after the probe proved useless. **The general rule that cost is worth keeping: a
+  probe that returns the same answer for a known-bad input is measuring nothing, so run the
+  bogus control before trusting any such check.**
 - **NEVER run `npx supabase config push` against this project.** It was considered on
   2026-10-12 as a way to add `kitchen` to the exposed schemas, because `supabase/config.toml`
   already declares `schemas = ["public", "graphql_public", "kitchen"]`. **It would have broken
@@ -1639,6 +1654,22 @@ with the query in this repo's history (`6c73667`).
 
 ### Known standing risks
 
+- **A KITCHEN VISIT RECORDED WEST OF UTC IN THE EVENING DOES NOT COUNT, for a member who
+  joined today.** `kitchen.activity_days.day` is the CLIENT's local date, and the write side
+  tolerates that on purpose: both the check constraint and `record_kitchen_visit` accept
+  `current_date - 1 .. current_date + 1` because "a day either side covers every real timezone
+  offset" (`0060`). The READ side in `0065` does not: `people()` counts
+  `ad.day > current_date - of_days`, and `of_days` has a floor of 1, so for somebody who joined
+  today the window is "strictly after yesterday" and a row stamped with the client's local
+  yesterday is dropped. **The owner then sees that person as never having arrived.** Wider
+  windows are unaffected, because a seven-day window already reaches past the skew.
+  Reproducible on demand rather than theoretical: `tests/integration/kitchen_numbers.test.ts`,
+  "a visit today counts once however many surfaces were opened", fails on any machine whose
+  local date is behind the database's UTC date, which here means every evening after 19:00
+  local. It survives `npx supabase db reset`, so it is not the browser-walk residue that the
+  triage above is about. **The fix is the read window, not the test**: it has to tolerate the
+  same day either side the writer was designed to accept. That needs a migration of its own.
+
 - **A FAMILY INVITE CODE CANNOT BE REVOKED FROM THE APP, and it never expires.** Every member
   sees the code on `/families` with a Copy button, `families_member_read` is what shows it to
   them, and `family_name_for_code` names the family to anyone holding it before they sign in.
@@ -1656,8 +1687,8 @@ with the query in this repo's history (`6c73667`).
   largest risk, which was that one Google account was the recovery route for all four.
   **Still open, in rough priority order:** a separate moderator-only account so that an XSS in
   the everyday session cannot list every email; a backup story, because `delete_user` is
-  irreversible and a bad `UPDATE` in the SQL editor has no undo; an audit log for admin
-  actions; a rate limit on the `admin` function, which `claim_extraction` already models for
+  irreversible and a bad `UPDATE` in the SQL editor has no undo; a rate limit on the `admin`
+  function, which `claim_extraction` already models for
   extraction; Supabase's leaked-password protection toggle; Dependabot; and an audit of
   Cloudflare API tokens and GitHub PATs.
 - **No page makes a third-party request, and that is now load-bearing.** The typeface is
