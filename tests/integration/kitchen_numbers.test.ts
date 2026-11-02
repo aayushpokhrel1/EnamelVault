@@ -295,6 +295,31 @@ async function recordVisit(who: Client, orgId: string, surface: string) {
   });
 }
 
+// The DATABASE's date, read back from a server-side default rather than taken from this
+// machine's clock. The defect below IS the two clocks disagreeing, so a test that derives its
+// dates from `today` above cannot see it: it only fails on a machine that happens to be skewed,
+// which is how the original sat green all morning and red every evening. kitchen.orgs.created_at
+// is `default now()` (0039) and the database runs in UTC, so its UTC date is `current_date`.
+async function dbToday(orgId: string) {
+  const { data } = await admin
+    .schema("kitchen")
+    .from("orgs")
+    .select("created_at")
+    .eq("id", orgId)
+    .single();
+  return new Date((data as { created_at: string }).created_at).toISOString().slice(0, 10);
+}
+
+// The day before that, which is what a client west of UTC stamps on a visit it makes in its
+// own evening. Admin is used for the clock only; every assertion below still goes through the
+// owner's own client, because the service role bypasses RLS and would pass whatever the
+// function did.
+async function dbYesterday(orgId: string) {
+  const d = new Date(`${await dbToday(orgId)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 async function people(owner: Client, orgId: string) {
   const { data, error } = await kitchen(owner).rpc("group_people", { p_org: orgId });
   expect(error).toBeNull();
@@ -390,6 +415,29 @@ describe("who comes back", () => {
     const data = await people(owner.client, orgId);
     const row = data.staff.find((r) => r.user_id === owner.id)!;
     // The figure counts DAYS and not visits, so two surfaces on one day is still one day back.
+    expect(row.days_back).toBe(1);
+  });
+
+  it("a visit stamped the client's local yesterday still counts as arriving", async () => {
+    const owner = await makeUser(`kit-num-owner-${stamp()}@t.dev`);
+    const orgId = await newOrg(owner.client, "Skewed Clock Group");
+
+    // The writer accepts a day either side on purpose (0064), because the column holds the
+    // CLIENT's local date and real offsets span UTC-12 to UTC+14. This is the row an owner in
+    // New York creates at nine in the evening, and before 0067 the read window dropped it: the
+    // person had arrived on their first day and was reported as never having come.
+    await kitchen(owner.client).rpc("record_kitchen_visit", {
+      p_org: orgId,
+      p_day: await dbYesterday(orgId),
+      p_surface: "dishes",
+    });
+
+    const data = await people(owner.client, orgId);
+    const row = data.staff.find((r) => r.user_id === owner.id)!;
+    expect(row.never).toBe(false);
+    // Still a fraction that can be read: the window is a day wider than its denominator, so
+    // the count is clamped rather than reporting 2 of 1.
+    expect(row.of_days).toBe(1);
     expect(row.days_back).toBe(1);
   });
 
