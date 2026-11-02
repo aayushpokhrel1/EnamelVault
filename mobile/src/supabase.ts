@@ -33,6 +33,10 @@ export const supabase = createClient(url, key, {
     // supabase-js directly, and leaving this on makes the client parse deep links it should
     // not touch.
     detectSessionInUrl: false,
+    // PKCE, not the implicit flow. The browser hands the app a single-use code rather than
+    // the tokens themselves, so a token never travels in a redirect URL that another app
+    // registered for this scheme could be handed.
+    flowType: "pkce",
   },
 });
 

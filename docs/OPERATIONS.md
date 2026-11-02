@@ -935,6 +935,14 @@ the queries are reconstructible from the tables listed above.
   inert: nothing breaks that was working, but an invite is still lost on every door except a
   password sign-in in the same tab.
 
+  **The phone app needs its own entry, and it is not a URL.** Google sign-in there comes back
+  to the app's own scheme, so Redirect URLs must also contain `familyrecipes://auth/callback**`.
+  It fails the same silent way: GoTrue substitutes the Site URL, the system browser lands on
+  the website, the app never hears anything, and nothing anywhere reports an error. Email
+  sign-in on the phone needs no entry at all, which is why it is the method to try first when
+  you want to know whether the app itself works. Apple sign-in needs no entry either: the token
+  comes from iOS, not from a redirect.
+
 - **The kitchen schema is invisible until the hosted project exposes it.** `supabase/config.toml`
   lists the exposed schemas for the LOCAL stack only. The hosted project has its own list at
   **Settings -> API -> Exposed schemas**, and **no migration changes it**. Migrations reached
