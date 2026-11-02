@@ -10,7 +10,7 @@ const intent = (overrides: Partial<Intent> = {}): Intent => ({
   kind: "edit",
   recipeId: "r1",
   baseUpdatedAt: "2026-11-01T09:00:00.000Z",
-  payload: { title: "Dal", prep_minutes: null, cook_minutes: null, visibility: "family", ingredients: [], steps: [] },
+  payload: { family_id: "family-1", title: "Dal", prep_minutes: null, cook_minutes: null, visibility: "family", ingredients: [], steps: [] },
   createdAt: "2026-11-02T10:00:00.000Z",
   state: "queued",
   error: null,
@@ -76,7 +76,6 @@ describe("shelfRows", () => {
       source_recipe_id: "elsewhere",
       source_cook_name: "Asha",
     });
-    await store.put("saves", { id: "s1", recipe_id: "r4", saved_at: "2026-11-01T00:00:00.000Z" });
     // Offline too: the byline is on the recipe row, so nothing here needs the network to
     // know whose dish it was.
     expect((await shelfRows(store))[0]).toMatchObject({ title: "Anar", byline: "Asha" });

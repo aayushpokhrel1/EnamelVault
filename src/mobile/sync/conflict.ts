@@ -39,6 +39,7 @@ export function describeConflict(intent: Intent, server: ServerRecipe): Conflict
     // draw them. A screen that has to work out whose is whose will get it wrong once.
     mine: intent.payload,
     theirs: {
+      family_id: server.recipe.family_id,
       title: server.recipe.title,
       prep_minutes: server.recipe.prep_minutes,
       cook_minutes: server.recipe.cook_minutes,

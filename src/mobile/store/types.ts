@@ -1,4 +1,8 @@
-export type TableName = "recipes" | "recipe_ingredients" | "recipe_steps" | "meal_plan_items" | "saves" | "outbox" | "meta";
+// No "saves" table, and that absence is deliberate. Saving a recipe from Potluck COPIES it
+// into the family's vault (save_recipe_to_vault, 0027), so a saved recipe is an ordinary
+// recipe row carrying source_recipe_id and source_cook_name. A local saves table would be a
+// table nothing on the server corresponds to, which is a table that drifts.
+export type TableName = "recipes" | "recipe_ingredients" | "recipe_steps" | "meal_plan_items" | "outbox" | "meta";
 
 export type Row = { id: string } & Record<string, unknown>;
 
@@ -72,14 +76,6 @@ export const SCHEMA: TableSchema[] = [
       recipe_id: "text",
       day: "text",
       meal: "text"
-    }
-  },
-  {
-    name: "saves",
-    columns: {
-      id: "text",
-      recipe_id: "text",
-      saved_at: "text"
     }
   },
   {

@@ -3,7 +3,6 @@ import type { ServerRecipe } from "./conflict";
 import { isLocalRecipeId, pending } from "./outbox";
 
 export type PlanItem = { id: string; plan_id: string; recipe_id: string; day: string; meal: string };
-export type Save = { id: string; recipe_id: string; saved_at: string };
 
 /**
  * `listRecipes` returns EVERY recipe the cook can currently read, not the ones changed since
@@ -17,7 +16,6 @@ export type Save = { id: string; recipe_id: string; saved_at: string };
  */
 export type CatchUpRemote = {
   listRecipes(): Promise<ServerRecipe[]>;
-  listSaves(): Promise<Save[]>;
   listPlanItems(from: string, to: string): Promise<PlanItem[]>;
 };
 
@@ -50,7 +48,7 @@ export async function lastCaughtUpAt(store: Store): Promise<string | null> {
   return row ? String(row.value) : null;
 }
 
-async function replaceAll(store: Store, table: "saves" | "meal_plan_items", rows: Row[]) {
+async function replaceAll(store: Store, table: "meal_plan_items", rows: Row[]) {
   for (const existing of await store.all<Row>(table)) await store.remove(table, existing.id);
   for (const row of rows) await store.put(table, row);
 }
@@ -85,7 +83,6 @@ export async function catchUp(
 ): Promise<{ pulled: number; dropped: number; at: string }> {
   const queued = new Set((await pending(store)).map((intent) => intent.recipeId));
   const server = await remote.listRecipes();
-  const saves = await remote.listSaves();
   const window = weekWindow(now);
   const planItems = await remote.listPlanItems(window.from, window.to);
 
@@ -114,7 +111,6 @@ export async function catchUp(
     dropped += 1;
   }
 
-  await replaceAll(store, "saves", saves);
   await replaceAll(store, "meal_plan_items", planItems);
 
   // Written LAST, and only here: a pull that threw halfway leaves the old timestamp, so the

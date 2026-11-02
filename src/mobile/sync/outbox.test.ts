@@ -18,6 +18,7 @@ const intent = (overrides: Partial<Intent> = {}): Intent => ({
   recipeId: localRecipeId(),
   baseUpdatedAt: null,
   payload: {
+    family_id: "family-1",
     title: "Dal",
     prep_minutes: 10,
     cook_minutes: 20,
@@ -78,7 +79,6 @@ describe("outbox", () => {
     await store.put("recipe_ingredients", { id: `${localId}:0`, recipe_id: localId, position: 0, item: "lentils" });
     await store.put("recipe_ingredients", { id: `${localId}:1`, recipe_id: localId, position: 1, item: "cumin" });
     await store.put("recipe_steps", { id: `${localId}:0`, recipe_id: localId, position: 0, text: "Rinse" });
-    await store.put("saves", { id: "save-1", recipe_id: localId });
     await store.put("meal_plan_items", { id: "item-1", recipe_id: localId });
 
     const create = intent({ id: "create-1", recipeId: localId });
@@ -100,7 +100,6 @@ describe("outbox", () => {
     expect(steps).toHaveLength(1);
     expect(steps[0].id).toBe(`${serverId}:0`);
 
-    expect((await store.get("saves", "save-1"))?.recipe_id).toBe(serverId);
     expect((await store.get("meal_plan_items", "item-1"))?.recipe_id).toBe(serverId);
 
     const queued = await pending(store);

@@ -11,6 +11,7 @@ const intent = (overrides: Partial<Intent> = {}): Intent => ({
   recipeId: "r1",
   baseUpdatedAt: "2026-11-01T09:00:00.000Z",
   payload: {
+    family_id: "family-1",
     title: "Dal, the way I make it",
     prep_minutes: 5,
     cook_minutes: 40,

@@ -37,7 +37,6 @@ const recipe = (id: string, overrides: Partial<Recipe> = {}): ServerRecipe => ({
 
 const remote = (overrides: Partial<CatchUpRemote> = {}): CatchUpRemote => ({
   listRecipes: async () => [],
-  listSaves: async () => [],
   listPlanItems: async () => [],
   ...overrides,
 });
@@ -47,7 +46,7 @@ const intent = (overrides: Partial<Intent> = {}): Intent => ({
   kind: "edit",
   recipeId: "r1",
   baseUpdatedAt: "2026-11-01T09:00:00.000Z",
-  payload: { title: "Mine", prep_minutes: null, cook_minutes: null, visibility: "family", ingredients: [], steps: [] },
+  payload: { family_id: "family-1", title: "Mine", prep_minutes: null, cook_minutes: null, visibility: "family", ingredients: [], steps: [] },
   createdAt: "2026-11-02T10:00:00.000Z",
   state: "queued",
   error: null,
@@ -106,20 +105,17 @@ describe("catchUp", () => {
     expect(result.dropped).toBe(0);
   });
 
-  it("saves and plan items are replaced, not merged", async () => {
-    await store.put("saves", { id: "old", recipe_id: "r9", saved_at: "2026-01-01T00:00:00.000Z" });
+  it("plan items are replaced, not merged", async () => {
     await store.put("meal_plan_items", { id: "old", plan_id: "p9", recipe_id: "r9", day: "2026-01-01", meal: "dinner" });
 
     await catchUp(
       store,
       remote({
-        listSaves: async () => [{ id: "s1", recipe_id: "r1", saved_at: "2026-11-01T00:00:00.000Z" }],
         listPlanItems: async () => [{ id: "i1", plan_id: "p1", recipe_id: "r1", day: "2026-11-03", meal: "dinner" }],
       }),
       NOW,
     );
 
-    expect((await store.all("saves")).map((row) => row.id)).toEqual(["s1"]);
     expect((await store.all("meal_plan_items")).map((row) => row.id)).toEqual(["i1"]);
   });
 
@@ -152,7 +148,7 @@ describe("catchUp", () => {
     expect(await lastCaughtUpAt(store)).toBeNull();
 
     await expect(
-      catchUp(store, remote({ listSaves: async () => { throw new Error("offline"); } }), NOW),
+      catchUp(store, remote({ listPlanItems: async () => { throw new Error("offline"); } }), NOW),
     ).rejects.toThrow("offline");
     expect(await lastCaughtUpAt(store)).toBeNull();
 

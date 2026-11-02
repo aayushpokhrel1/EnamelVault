@@ -10,7 +10,7 @@ const intent = (overrides: Partial<Intent> = {}): Intent => ({
   kind: "edit",
   recipeId: "recipe-1",
   baseUpdatedAt: "2026-11-01T09:00:00.000Z",
-  payload: { title: "Dal", prep_minutes: null, cook_minutes: null, visibility: "family", ingredients: [], steps: [] },
+  payload: { family_id: "family-1", title: "Dal", prep_minutes: null, cook_minutes: null, visibility: "family", ingredients: [], steps: [] },
   createdAt: "2026-11-02T10:00:00.000Z",
   state: "queued",
   error: null,

@@ -1,4 +1,4 @@
-import type { DraftPayload, Intent } from "./outbox";
+import type { Intent } from "./outbox";
 import type { Store } from "../store/types";
 import type { ServerRecipe } from "./conflict";
 import { hasMoved } from "./conflict";
@@ -11,17 +11,33 @@ import { markConflicted, markFailed, markSent, pending } from "./outbox";
  * is. This is the same rule `src/lib/api/` follows and the reason
  * `tests/integration/silent_refusals.test.ts` exists.
  */
-export type RemoteResult<T> = { row: T | null; error: string | null };
+export type RemoteResult<T> = {
+  row: T | null;
+  error: string | null;
+  /**
+   * The server refused because the recipe moved under the edit. It is set by the adapter
+   * from the custom SQLSTATE `publish_recipe_edit` raises, and it matters because the
+   * SERVER'S check is the authoritative one: `hasMoved` below is only an early exit, and the
+   * window between the two is exactly where somebody else's edit lands.
+   */
+  moved?: boolean;
+};
 
 export type Remote = {
   getRecipe(id: string): Promise<RemoteResult<ServerRecipe>>;
-  createRecipe(payload: DraftPayload): Promise<RemoteResult<{ id: string }>>;
+  createRecipe(intent: Intent): Promise<RemoteResult<{ id: string }>>;
   /**
    * Lands through `publish_recipe_edit`, never a direct update of `recipes`: the publish
    * rules are a trigger, and a second write path is a second place to forget them.
    * `force` is what the conflict screen sends when the cook chooses to keep their version.
+   *
+   * It takes the whole INTENT, not just the payload, because the draft it writes must carry
+   * `base_updated_at` as it was when the edit was made. Handing it only the payload would
+   * leave the draft to use the recipe's CURRENT timestamp, which makes the RPC's own
+   * staleness check pass by construction. That check is the real one: the window between
+   * hasMoved below and the write is exactly where somebody else's edit lands.
    */
-  publishEdit(recipeId: string, payload: DraftPayload, force: boolean): Promise<RemoteResult<{ id: string }>>;
+  publishEdit(intent: Intent, force: boolean): Promise<RemoteResult<{ id: string }>>;
 };
 
 export type Outcome = "sent" | "conflicted" | "failed";
@@ -37,7 +53,7 @@ async function fail(store: Store, intent: Intent, message: string): Promise<Outc
 
 export async function replayOne(store: Store, remote: Remote, intent: Intent): Promise<Outcome> {
   if (intent.kind === "create") {
-    const created = await remote.createRecipe(intent.payload);
+    const created = await remote.createRecipe(intent);
     if (created.error) return fail(store, intent, created.error);
     if (!created.row) return fail(store, intent, REFUSED);
     await markSent(store, intent.id, created.row.id);
@@ -55,7 +71,13 @@ export async function replayOne(store: Store, remote: Remote, intent: Intent): P
     return "conflicted";
   }
 
-  const published = await remote.publishEdit(intent.recipeId, intent.payload, false);
+  const published = await remote.publishEdit(intent, false);
+  // Checked BEFORE error and before row: a move is a conflict, not a failure, and a failed
+  // intent retries for ever against a recipe that will never match again.
+  if (published.moved) {
+    await markConflicted(store, intent.id);
+    return "conflicted";
+  }
   if (published.error) return fail(store, intent, published.error);
   if (!published.row) return fail(store, intent, REFUSED);
   await markSent(store, intent.id, published.row.id);

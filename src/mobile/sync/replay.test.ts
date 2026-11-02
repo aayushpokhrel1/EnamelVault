@@ -16,6 +16,7 @@ const intent = (overrides: Partial<Intent> = {}): Intent => ({
   recipeId: "recipe-1",
   baseUpdatedAt: BASE,
   payload: {
+    family_id: "family-1",
     title: "Dal",
     prep_minutes: 10,
     cook_minutes: 20,
@@ -130,6 +131,24 @@ describe("replay", () => {
     expect((await store.get("outbox", "intent-1"))?.state).toBe("conflicted");
   });
 
+  it("the server's own refusal of a stale edit is a conflict, not a failure", async () => {
+    const edit = intent();
+    await enqueue(store, edit);
+    // The client check passed: getRecipe returns the base timestamp. The SERVER still
+    // refuses, because somebody else's edit landed in the window between the two. That is
+    // the case the client check cannot see, and treating it as a failure would retry for
+    // ever against a recipe that will never match again.
+    const outcome = await replayOne(
+      store,
+      fakeRemote({ publishEdit: async () => ({ row: null, error: null, moved: true }) }),
+      edit,
+    );
+
+    expect(outcome).toBe("conflicted");
+    expect(await pending(store)).toEqual([]);
+    expect((await store.get("outbox", "intent-1"))?.state).toBe("conflicted");
+  });
+
   it("a transport error keeps the message the screen will show", async () => {
     const edit = intent();
     await enqueue(store, edit);
@@ -178,7 +197,7 @@ describe("replay", () => {
         seen.push(id);
         return ok(serverRecipe(BASE));
       },
-      publishEdit: async (id) => ok({ id }),
+      publishEdit: async (sending) => ok({ id: sending.recipeId }),
     });
 
     expect(await replayAll(store, remote)).toEqual({ sent: 2, conflicted: 0, failed: 0 });

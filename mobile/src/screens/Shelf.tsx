@@ -6,6 +6,7 @@ import type { ShelfRow, SyncState } from "../../../src/mobile/shelf";
 import { shelfRows } from "../../../src/mobile/shelf";
 import { lastCaughtUpAt } from "../../../src/mobile/sync/catchup";
 import { useStore } from "../storeContext";
+import { useSync } from "../sync/useSync";
 
 // What each state says to a cook, in words rather than in a colour. A dot alone is unreadable
 // to anyone who cannot tell the colours apart, and "failed" with no sentence is a dead end.
@@ -25,6 +26,7 @@ const when = (at: string | null): string => {
 export default function Shelf() {
   const store = useStore();
   const router = useRouter();
+  const sync = useSync(store);
   const [rows, setRows] = useState<ShelfRow[] | null>(null);
   const [caughtUp, setCaughtUp] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,7 +38,8 @@ export default function Shelf() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // Re-read after every sync finishes, so what landed is on screen without a pull-down.
+  }, [load, sync.running]);
 
   return (
     <View style={styles.screen}>
@@ -50,13 +53,23 @@ export default function Shelf() {
             tintColor={COLORS.onWall}
             onRefresh={() => {
               setRefreshing(true);
-              void load().finally(() => setRefreshing(false));
+              void sync
+                .sync()
+                .then(load)
+                .finally(() => setRefreshing(false));
             }}
           />
         }
         ListHeaderComponent={
           <>
-            <Text style={styles.caughtUp}>{when(caughtUp)}</Text>
+            <Text style={styles.caughtUp}>
+              {sync.running ? "Catching up…" : when(caughtUp)}
+            </Text>
+            {/* Said plainly, and only once something was actually tried. Offline is the
+                ordinary state for this app, not an error to shout about. */}
+            {sync.error !== null && !sync.running && (
+              <Text style={styles.caughtUp}>Could not reach the kitchen. Showing what is on this phone.</Text>
+            )}
             {/* Scaffolding, and it says so: __DEV__ is false in a release build, so this is
                 the one way to reach the SQLite contract check without shipping it. */}
             {__DEV__ && (

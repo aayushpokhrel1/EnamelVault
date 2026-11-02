@@ -6,6 +6,10 @@ import type { Store, Row, TableName } from "../store/types";
 // are free to diverge. The field names match the server's columns on purpose, so replay
 // does not have to invent a mapping of its own.
 export type DraftPayload = {
+  // Which family the recipe belongs to. A create made offline has to carry it: the server
+  // cannot infer it, and a cook in two families would otherwise have their recipe land in
+  // whichever one the server guessed. An edit carries it unchanged.
+  family_id: string;
   title: string;
   prep_minutes: number | null;
   cook_minutes: number | null;
@@ -138,7 +142,6 @@ export async function markSent(store: Store, intentId: string, serverRecipeId: s
     await repointChildren(tx, "recipe_ingredients", localId, serverRecipeId);
     await repointChildren(tx, "recipe_steps", localId, serverRecipeId);
     await repointReferences(tx, "meal_plan_items", localId, serverRecipeId);
-    await repointReferences(tx, "saves", localId, serverRecipeId);
     await repointReferences(tx, "outbox", localId, serverRecipeId);
   });
 }
