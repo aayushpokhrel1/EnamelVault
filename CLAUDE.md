@@ -48,7 +48,7 @@ comment you cannot avoid) over a document.
 **Use `/update-docs-familyrecipes`** (`.claude/commands/update-docs-familyrecipes.md`) rather
 than re-deriving the sweep. There is also a user-level `/update-docs` holding the generic
 discipline for every project; **this repo's is the one to run here**, because it carries the
-real commands (`npx supabase migration list --linked`, `/health/version`) and this repo's file
+real commands (`npx supabase migration list --remote`, `/health/version`) and this repo's file
 routing. The names are deliberately different: they were both `update-docs` for an hour, and the
 user-level one won, so the repo-specific procedure never loaded.
 It holds the measurements to run, the routing table to route each fact by, and the specific

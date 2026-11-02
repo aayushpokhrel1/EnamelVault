@@ -328,7 +328,7 @@ Three targets that are deployed **separately**. Confusing them wastes time.
 | target | how | automatic? |
 | --- | --- | --- |
 | Frontend | Cloudflare Workers Builds, Git-connected to master | usually, on push, but **verify** |
-| Database | `npx supabase db push` | no |
+| Database | `npx supabase db push --remote --yes` | no |
 | Edge function | `npx supabase functions deploy <name> --use-api`, one at a time | **no, never** |
 
 **Pass `--use-api`.** Without it the CLI bundles in a local Docker container, and when the Docker
@@ -351,8 +351,8 @@ is correct rather than stale.
 Database, then edge function, then frontend. Always that way round, and the reason is not
 tidiness: each step is what the next one depends on.
 
-1. **`npx supabase db push`** — tables, columns and functions must exist before anything calls
-   them.
+1. **`npx supabase db push --remote --yes`** — tables, columns and functions must exist before
+   anything calls them. **`--remote` IS LOAD-BEARING** and the reason is below.
 2. **`npx supabase functions deploy <name>`** — one at a time, by name. `ACTIVE` in the
    dashboard means deployed, not current.
 3. **Push master**, so Cloudflare builds the frontend that uses both.
@@ -472,10 +472,10 @@ carries current state.
 **The part worth keeping: the handover said 0035 was local-only, and it was wrong.** 0035 had
 been pushed. A bug was found in it and corrected IN PLACE on the strength of that sentence,
 which would have fixed nothing on production while making the local migration history disagree
-with what the remote had actually run. `npx supabase migration list --linked` caught it during
+with what the remote had actually run. `npx supabase migration list --remote` caught it during
 the deploy, and the correction became `0036_hiding_rule_is_catalogue_only.sql`.
 
-**So: `npx supabase migration list --linked` is the ONLY authority on what is applied. Run it
+**So: `npx supabase migration list --remote` is the ONLY authority on what is applied. Run it
 before editing any migration file.** If the version appears under `remote`, it is immutable:
 write the next number instead. A document, this one included, can be stale; the remote cannot.
 
@@ -653,11 +653,23 @@ not the record.
 ### Database
 
 ```bash
-npx supabase db push
+npx supabase db push --remote --yes
 ```
 
-Linked to project ref `ghcclshgdtbystosfzjl`. **Never** `db reset --linked` now that there is
-real data. Check what is actually applied with `npx supabase migration list --linked` and look
+**WITHOUT `--remote` THIS COMMAND PUSHES TO THE LOCAL STACK AND SAYS SO IN A LINE THAT READS
+LIKE SUCCESS.** CLI v3 changed the default target, and `--linked` became `--remote`; the old
+spelling only warns. On 2026-11-02 a `db push` copied from this file answered
+`{"upToDate":true,...,"message":"Local database is up to date."}` while production stayed a
+migration behind, and the fix looked deployed for an hour. Read the `Target:` line the CLI
+prints before believing any of them: it names `local stack` or `project FamilyRecipe ·
+production`.
+
+**`--yes` is needed too, and only in an agent run.** v3 refuses a hosted mutation it cannot
+get a confirmation for, with `HostedMutationConsentRequiredError`, which is a refusal and not
+a failure: nothing was changed.
+
+Linked to project ref `ghcclshgdtbystosfzjl`. **Never** `db reset --remote` now that there is
+real data. Check what is actually applied with `npx supabase migration list --remote` and look
 for `"remote":""`.
 
 ### Edge function

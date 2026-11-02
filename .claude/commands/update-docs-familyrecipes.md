@@ -23,7 +23,7 @@ npx tsc -b && npm test
 - integration count: `npx vitest run tests/integration` (needs `SB_URL`, `SB_ANON_KEY`,
   `SB_SERVICE_KEY` from `npx supabase status -o env`)
 - latest migration: `ls supabase/migrations | tail -1`, and what cloud has:
-  `npx supabase migration list --linked`
+  `npx supabase migration list --remote`
 - head commit and whether it is pushed: `git log --oneline -1`,
   `git log --oneline origin/master..HEAD`
 - what production is actually serving: `curl -s https://recipes.enamelvault.com/health/version`
