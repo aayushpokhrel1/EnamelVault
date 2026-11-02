@@ -68,3 +68,11 @@ review.diff
 # Wrangler local secrets. NEVER committed: this is where a real SUPABASE_ANON_KEY or any
 # other binding value lands when you run the Worker locally.
 .dev.vars
+
+# The phone app (Expo). Its .env holds the same publishable key the web app ships,
+# but a committed .env is still a habit worth not having.
+mobile/node_modules/
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/.env

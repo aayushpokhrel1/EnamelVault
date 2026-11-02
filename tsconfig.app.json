@@ -22,5 +22,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // src/mobile is the phone app's core: no DOM, its own project (tsconfig.mobile.json).
+  "exclude": ["src/mobile"]
 }
