@@ -37,7 +37,14 @@ const resolveImport = (fromFile: string, spec: string): string | null => {
 // TERMS_VERSION lives there so the phone gate compares against the same value the web gate
 // does: a copy of a consent version is a copy that drifts, and the version is the only
 // evidence of what somebody actually agreed to.
-const ALLOWED_FROM_MOBILE = /(\/lib\/api\/(types|normalizeItem|quantity|units|primaryIngredients)|\/lib\/legal)$/;
+const ALLOWED_FROM_MOBILE = /(\/lib\/api\/(types|normalizeItem|quantity|units|primaryIngredients)|\/lib\/(legal|stepDuration))$/;
+
+// Allowed ONLY while they have no imports of their own, which the test below holds them to.
+// Sharing beats copying here for a specific reason: stepDuration's rules were paid for, not
+// guessed. The unit must match as a whole word or "500 mg" becomes five hundred minutes, a
+// range rings at the longer end, and "half an hour" is rejected on purpose. A second parser
+// on the phone would relearn each of those the hard way.
+const IMPORT_FREE = ["src/lib/legal.ts", "src/lib/stepDuration.ts"];
 
 it("no module under src/mobile imports react-native or expo", () => {
   const offenders: string[] = [];
@@ -88,12 +95,18 @@ it("the helpers src/mobile is allowed to import touch no client", () => {
   expect(offenders).toEqual([]);
 });
 
-it("lib/legal is constants only, which is the whole reason it may be imported", () => {
-  // The allowance above rests on this file having no imports at all. The moment it gains
-  // one, "constants only" is a claim rather than a fact, and the phone core has a path into
-  // the web app through a file nobody thinks of as code.
-  const text = readFileSync("src/lib/legal.ts", "utf8");
-  expect([...text.matchAll(/^\s*(?:import|export)[^;]*?from\s+"([^"]+)"/gm)].map((m) => m[1])).toEqual([]);
+it("the shared web modules have no imports, which is the whole reason they may be imported", () => {
+  // The allowance above rests on these files importing nothing at all. The moment one gains
+  // an import, "pure" is a claim rather than a fact, and the phone core has a path into the
+  // web app through a file nobody thinks of as a door.
+  const offenders: string[] = [];
+  for (const file of IMPORT_FREE) {
+    const text = readFileSync(file, "utf8");
+    for (const [, spec] of text.matchAll(/^\s*(?:import|export)[^;]*?from\s+"([^"]+)"/gm)) {
+      offenders.push(`${file} imports ${spec}`);
+    }
+  }
+  expect(offenders).toEqual([]);
 });
 
 it("the phone app imports no web app page or component", () => {
