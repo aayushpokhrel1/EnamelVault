@@ -1,8 +1,8 @@
 import type { Intent } from "./outbox";
-import type { Store } from "../store/types";
+import type { Row, Store } from "../store/types";
 import type { ServerRecipe } from "./conflict";
 import { hasMoved } from "./conflict";
-import { markConflicted, markFailed, markSent, pending } from "./outbox";
+import { intentFrom, markConflicted, markFailed, markSent, pending } from "./outbox";
 
 /**
  * Every call hands back the row it wrote, because A WRITE REFUSED BY RLS IS NOT AN ERROR:
@@ -105,4 +105,50 @@ export async function replayAll(
     attempted.add(next.id);
     tally[await replayOne(store, remote, next)] += 1;
   }
+}
+
+/**
+ * What the cook chose on the conflict screen.
+ *
+ * "theirs" DROPS the intent and leaves the server alone: the cook's version is gone, which
+ * the screen says in those words before the tap rather than afterwards in a warning.
+ *
+ * "mine" republishes with force, which is what `publish_recipe_edit`'s p_force is for. A
+ * resolution the database REFUSES is not a resolution: the intent stays conflicted so the
+ * screen is still there, because the alternative is telling somebody their choice was taken
+ * when nothing was written.
+ */
+export async function resolveConflict(
+  store: Store,
+  remote: Remote,
+  intentId: string,
+  keep: "mine" | "theirs",
+): Promise<"sent" | "dropped" | "failed"> {
+  const row = await store.get<Row>("outbox", intentId);
+  if (!row) return "failed";
+  const intent = intentFrom(row);
+
+  if (keep === "theirs") {
+    await store.remove("outbox", intentId);
+    return "dropped";
+  }
+
+  // Routed by kind, exactly as replayOne is. A create forced through publishEdit would write
+  // a draft targeting a `local:` id the server has never heard of, and the fake in a test
+  // that does not check WHICH call was made will happily accept it.
+  const published =
+    intent.kind === "create" ? await remote.createRecipe(intent) : await remote.publishEdit(intent, true);
+  if (published.error) {
+    await markFailed(store, intentId, published.error);
+    return "failed";
+  }
+  // force was true, so a refusal here is not staleness: it is a policy saying this cook may
+  // not write this recipe at all. Still conflicted, because the cook has not been given an
+  // outcome they can act on yet.
+  if (!published.row) {
+    await markFailed(store, intentId, REFUSED);
+    return "failed";
+  }
+  await markSent(store, intentId, published.row.id);
+  return "sent";
 }

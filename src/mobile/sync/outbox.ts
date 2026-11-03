@@ -67,7 +67,12 @@ const toRow = (intent: Intent): Row => ({
   error: intent.error,
 });
 
-const toIntent = (row: Row): Intent => ({
+/**
+ * The row to intent conversion, exported because resolveConflict needs one intent by id and
+ * a second copy of this mapping is how the two drift and start dropping a field only one of
+ * them knows about.
+ */
+export const intentFrom = (row: Row): Intent => ({
   id: row.id,
   kind: text(row, "kind") === "edit" ? "edit" : "create",
   recipeId: text(row, "recipe_id"),
@@ -94,7 +99,7 @@ export async function pending(store: Store): Promise<Intent[]> {
     // Compared as strings, not parsed to Date: these are ISO-8601 from one clock, so they
     // sort lexically, and parsing is how this repo has already shipped a timezone defect.
     .sort((a, b) => text(a, "created_at").localeCompare(text(b, "created_at")))
-    .map(toIntent);
+    .map(intentFrom);
 }
 
 async function repointChildren(tx: Store, table: TableName, localId: string, serverRecipeId: string) {

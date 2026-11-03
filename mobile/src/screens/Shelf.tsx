@@ -110,7 +110,15 @@ export default function Shelf() {
             accessibilityLabel={[item.title, item.byline && `by ${item.byline}`, SAYS[item.sync]]
               .filter(Boolean)
               .join(", ")}
-            onPress={() => router.push(`/recipe/${encodeURIComponent(item.id)}`)}
+            onPress={() =>
+              router.push(
+                // A conflict goes to the choice, not to the recipe. Tapping a row that says
+                // "someone else changed this" and landing on a read-only page is a dead end.
+                item.intentId !== null
+                  ? `/conflict/${encodeURIComponent(item.intentId)}`
+                  : `/recipe/${encodeURIComponent(item.id)}`,
+              )
+            }
           >
             <Text style={styles.title}>{item.title}</Text>
             {item.byline !== null && <Text style={styles.meta}>by {item.byline}</Text>}

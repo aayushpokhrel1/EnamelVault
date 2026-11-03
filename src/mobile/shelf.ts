@@ -11,6 +11,8 @@ export type ShelfRow = {
   /** Prep and cook together, because that is the number a cook plans around. */
   minutes: number | null;
   sync: SyncState;
+  /** The intent to open when `sync` is "conflicted". Null otherwise. */
+  intentId: string | null;
 };
 
 const number = (value: unknown): number | null => (typeof value === "number" ? value : null);
@@ -28,14 +30,16 @@ const totalMinutes = (row: Row): number | null => {
 const SEVERITY: SyncState[] = ["conflicted", "failed", "queued"];
 
 export async function shelfRows(store: Store): Promise<ShelfRow[]> {
-  const states = new Map<string, SyncState>();
+  const states = new Map<string, { sync: SyncState; intentId: string }>();
   for (const intent of await store.all<Row>("outbox")) {
     const recipeId = String(intent.recipe_id ?? "");
     const state = String(intent.state ?? "");
     const mapped: SyncState =
       state === "conflicted" ? "conflicted" : state === "failed" ? "failed" : "queued";
     const held = states.get(recipeId);
-    if (!held || SEVERITY.indexOf(mapped) < SEVERITY.indexOf(held)) states.set(recipeId, mapped);
+    if (!held || SEVERITY.indexOf(mapped) < SEVERITY.indexOf(held.sync)) {
+      states.set(recipeId, { sync: mapped, intentId: intent.id });
+    }
   }
 
   const rows = await store.all<Row>("recipes");
@@ -51,7 +55,10 @@ export async function shelfRows(store: Store): Promise<ShelfRow[]> {
       // A recipe created offline has no server id and no intent state of its own beyond its
       // create, which is already in the map. It belongs on the shelf from the moment it is
       // written: a cook who typed a recipe on a train must see it.
-      sync: states.get(row.id) ?? (isLocalRecipeId(row.id) ? "queued" : "synced"),
+      sync: states.get(row.id)?.sync ?? (isLocalRecipeId(row.id) ? "queued" : "synced"),
+      // Only for a conflict, because that is the only state the cook can act on. Carrying
+      // it for every row would invite a screen to open a settled intent.
+      intentId: states.get(row.id)?.sync === "conflicted" ? (states.get(row.id)?.intentId ?? null) : null,
     }))
     // By title, ignoring case, because a shelf sorted by a hidden id or by insertion order
     // is a shelf nobody can find anything on.

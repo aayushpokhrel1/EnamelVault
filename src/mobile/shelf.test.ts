@@ -40,10 +40,20 @@ describe("shelfRows", () => {
     expect((await shelfRows(store))[0].sync).toBe("failed");
   });
 
-  it("a recipe in conflict reports conflicted", async () => {
+  it("a recipe in conflict reports conflicted, and names the intent to open", async () => {
     await enqueue(store, intent());
     await markConflicted(store, "intent-1");
-    expect((await shelfRows(store))[0].sync).toBe("conflicted");
+    const [row] = await shelfRows(store);
+    expect(row.sync).toBe("conflicted");
+    expect(row.intentId).toBe("intent-1");
+  });
+
+  it("only a conflict carries an intent to open", async () => {
+    // Carrying it for every row would invite a screen to open a settled intent.
+    await enqueue(store, intent());
+    expect((await shelfRows(store))[0].intentId).toBeNull();
+    await markFailed(store, "intent-1", "offline");
+    expect((await shelfRows(store))[0].intentId).toBeNull();
   });
 
   it("the state that needs a person wins over the one that needs the network", async () => {
