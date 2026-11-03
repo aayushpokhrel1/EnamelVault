@@ -48,7 +48,17 @@ function sourcesUnder(dir: string): { path: string; text: string }[] {
   return out;
 }
 
-const code = [...sourcesUnder("src"), ...sourcesUnder("supabase/functions"), ...sourcesUnder("worker")];
+// `mobile/src` is listed separately from `src` because it is NOT under it: the phone app's
+// Expo half lives in its own package, so a guard that walked `src` alone reported success for
+// an entire outbound surface it could not see. That is the same shape as the terms guard which
+// covered one router of three while the kitchen app shipped ungated. A new app directory is
+// another line here, and forgetting it is silent.
+const code = [
+  ...sourcesUnder("src"),
+  ...sourcesUnder("mobile/src"),
+  ...sourcesUnder("supabase/functions"),
+  ...sourcesUnder("worker"),
+];
 
 // Every AI endpoint this project has ever been pointed at, and the company name that MUST then
 // appear on the privacy page. Add a row before pointing a secret at a new one. The point of

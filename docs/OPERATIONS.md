@@ -1390,6 +1390,74 @@ public recipe URL. **The Worker is what serves both of these, so neither works f
 `npm run dev`**: Vite serves `robots.txt` as a static file but knows nothing about
 `/sitemap.xml`. Test them against a deployed preview or production, not locally.
 
+## The phone app: building it, signing it, and shipping it
+
+The phone app is `mobile/`, Expo SDK 58 managed, built by EAS. It is not deployed by
+Cloudflare and nothing about it is automatic: **no commit anywhere builds or ships this app.**
+
+### Two things must be true before the first build, and neither is in the repo
+
+1. **`mobile/.env` holds the real publishable key.** It ships with
+   `EXPO_PUBLIC_SUPABASE_ANON_KEY=PASTE_PUBLISHABLE_KEY`, and `mobile/src/supabase.ts` throws
+   at startup on that literal rather than failing later with an opaque 401. Read the real one
+   with:
+
+   ```bash
+   npx supabase projects api-keys --project-ref ghcclshgdtbystosfzjl
+   ```
+
+   `.env` is gitignored, so a fresh clone and every CI runner starts from the placeholder.
+   **Never the service key**: it bypasses RLS and would be readable in the bundle on a
+   rooted phone, where the whole security model is RLS.
+
+2. **`familyrecipes://auth/callback**` is in the hosted project's Redirect URLs** if Google
+   sign-in is wanted, globstar included. Email sign-in needs no entry and Apple needs none,
+   which is why email is the method to try first when something is wrong: it isolates the
+   failure to the allow list. The measurement that a missing entry is silent, not loud, is in
+   the Environment gotchas section above.
+
+### The build
+
+```bash
+cd mobile && npx eas build --platform ios --profile production
+```
+
+`eas.json` holds three profiles: `development` (a dev client for Metro), `preview` (internal
+distribution, for the device walk) and `production` (`autoIncrement`, store distribution).
+`appVersionSource` is `remote`, so **the build number lives on EAS and not in `app.json`**:
+bumping it by hand in the repo changes nothing, and two local builds would otherwise collide
+on the same number.
+
+Signing credentials are held by EAS, not here. There is deliberately no keystore and no
+`.p8` in this repository, and `mobile/credentials.json` is not used.
+
+### The store privacy labels must agree with `Privacy.tsx`, which is the authority
+
+`src/pages/Privacy.tsx` names every third party this app can reach, and
+`supabase/processors.test.ts` fails the build if the code can reach one the page does not
+name. The store questionnaires ask the same question in their own words, so **the page is the
+source and the labels are the copy, never the other way round**. As of 2026-11-02 the named
+set is Supabase, Cloudflare, Google (sign-in and Gemini), DeepSeek and Groq.
+
+What that means for the forms, in their vocabulary:
+
+| They ask about | The answer, and why |
+| --- | --- |
+| Contact info (email address) | Collected, linked to identity, used for app functionality only. It is the sign-in identifier. |
+| User content (recipes, photos, comments) | Collected, linked to identity. Recipe text reaches the extraction providers above when a cook asks for an import; nothing is sent otherwise. |
+| Identifiers | Collected, linked to identity: the account id. No advertising identifier is read, and there is no SDK in the app that could read one. |
+| Usage data, diagnostics | **Not collected.** There is no analytics SDK and no crash reporter in `mobile/`. `src/lib/browserStorage.test.ts` holds the web side of this claim; the phone side is that `mobile/package.json` has no such dependency, which a reader can check in one glance. |
+| Tracking (ATT) | **No.** Nothing is shared with a data broker and nothing is joined with third-party data, so the app does not need the App Tracking Transparency prompt. Adding anything that does makes `Privacy.tsx` part of that change. |
+
+### Cold start against Safari: NOT YET MEASURED
+
+The plan asks for both numbers in this file, three runs each, and **neither has been taken**:
+nothing has run on a real phone yet. The procedure, so the numbers are comparable when they
+are taken: force quit both, then time from tap to the shelf being readable on the phone app,
+and from tap to the recipe list being readable at `enamelvault.com` in Safari, three times
+each, on the same device and the same network. Write both medians here with the device and
+the date, because a number with no device attached cannot be compared to the next one.
+
 ## Compliance: the three claims the code has to keep true
 
 The public pages make statements about this app. Each is backed by a test rather than by
