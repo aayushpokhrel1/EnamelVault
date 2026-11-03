@@ -2,7 +2,7 @@
 // into the family's vault (save_recipe_to_vault, 0027), so a saved recipe is an ordinary
 // recipe row carrying source_recipe_id and source_cook_name. A local saves table would be a
 // table nothing on the server corresponds to, which is a table that drifts.
-export type TableName = "recipes" | "recipe_ingredients" | "recipe_steps" | "meal_plan_items" | "outbox" | "meta";
+export type TableName = "families" | "recipes" | "recipe_ingredients" | "recipe_steps" | "meal_plan_items" | "outbox" | "meta";
 
 export type Row = { id: string } & Record<string, unknown>;
 
@@ -22,6 +22,14 @@ export interface Store {
 // `Ingredient` and `Step`, so the device needs one it can always compute.
 
 export const SCHEMA: TableSchema[] = [
+  {
+    // The families this account belongs to. Pulled, not derived from the recipes on the
+    // device: a cook with a brand new family has no recipes to derive one from, and without
+    // this they could not create their first one offline. This mirrors a real server table,
+    // which is the test for whether a local table should exist at all.
+    name: "families",
+    columns: { id: "text", name: "text", role: "text" },
+  },
   {
     name: "recipes",
     columns: {

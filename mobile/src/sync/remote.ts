@@ -2,7 +2,7 @@ import type { Ingredient, Recipe, Step } from "../../../src/lib/api/types";
 import type { Intent } from "../../../src/mobile/sync/outbox";
 import type { ServerRecipe } from "../../../src/mobile/sync/conflict";
 import type { Remote, RemoteResult } from "../../../src/mobile/sync/replay";
-import type { CatchUpRemote, PlanItem } from "../../../src/mobile/sync/catchup";
+import type { CatchUpRemote, Family, PlanItem } from "../../../src/mobile/sync/catchup";
 import { supabase } from "../supabase";
 
 /**
@@ -171,6 +171,24 @@ export const remote: Remote & CatchUpRemote = {
     }
     if (!data) return refused();
     return ok({ id: String(data) });
+  },
+
+  async listFamilies() {
+    // family_members carries the role, and `families` carries the name, so this is one
+    // embedded select rather than two round trips. RLS already limits it to this account's
+    // rows; the filter is not what makes it safe, it is what makes it correct.
+    const { data, error } = await supabase.from("family_members").select("role, families(id, name)");
+    if (error) throw new Error(error.message);
+    // PostgREST types an embedded relation as an array, and returns an object for a
+    // to-one. Both shapes are handled rather than cast away: a cast here would be a silent
+    // crash the day the generated types change.
+    type Embedded = { role: string; families: { id: string; name: string } | { id: string; name: string }[] | null };
+    return ((data ?? []) as unknown as Embedded[])
+      .map((row) => {
+        const family = Array.isArray(row.families) ? row.families[0] : row.families;
+        return family ? { id: family.id, name: family.name, role: row.role } : null;
+      })
+      .filter((family): family is Family => family !== null);
   },
 
   async listRecipes() {

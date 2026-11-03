@@ -1,6 +1,7 @@
 import type { Ingredient, Step, Visibility } from "../lib/api/types";
 import type { Row, Store } from "./store/types";
 import type { DraftPayload } from "./sync/outbox";
+import { enqueue, localRecipeId } from "./sync/outbox";
 
 export type RecipeView = {
   id: string;
@@ -39,6 +40,9 @@ const toIngredient = (row: Row): Ingredient => ({
 });
 
 const toStep = (row: Row): Step => ({ position: position(row), text: String(row.text ?? "") });
+
+// An intent's own id. It only has to be unique on this device: the server never sees it.
+const intentId = (): string => `intent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * The queued write that owns this recipe, if there is one. There is at most one per recipe
@@ -85,4 +89,92 @@ export async function recipeView(store: Store, id: string): Promise<RecipeView |
     steps: payload ? [...payload.steps].sort((a, b) => a.position - b.position) : stored.steps,
     showingLocalEdit: payload !== null,
   };
+}
+
+/**
+ * Queue an edit. The intent carries the recipe's `updated_at` AS THE DEVICE LAST SAW IT, not
+ * the time of the edit: that is the revision the cook was looking at while they typed, and
+ * it is what both the client check and the RPC compare against.
+ *
+ * A second edit REPLACES the first rather than queueing beside it. Two intents for one
+ * recipe would replay in order, the first landing and moving `updated_at`, the second then
+ * refusing as stale against a change the same cook had just made.
+ */
+export async function queueEdit(store: Store, id: string, payload: DraftPayload): Promise<void> {
+  const row = await store.get<Row>("recipes", id);
+  if (!row) throw new Error("That recipe is not on this phone.");
+
+  const existing = (await store.all<Row>("outbox")).find((intent) => intent.recipe_id === id);
+  if (existing) {
+    // The base stays the ORIGINAL one. The server has not moved as far as this device knows,
+    // so the revision this edit is against is still the one the first edit was against;
+    // replacing it with anything newer would be inventing knowledge of the server.
+    //
+    // And a CREATE stays a create. Turning it into an edit would send a create the server
+    // never received, then an edit against an id it has never heard of.
+    await store.put("outbox", {
+      ...existing,
+      payload,
+      state: "queued",
+      error: null,
+    });
+    return;
+  }
+
+  await enqueue(store, {
+    id: intentId(),
+    kind: "edit",
+    recipeId: id,
+    baseUpdatedAt: text(row.updated_at),
+    payload,
+    createdAt: new Date().toISOString(),
+    state: "queued",
+    error: null,
+  });
+}
+
+/**
+ * Queue a create, and write the recipe row at the same time so it is on the shelf before it
+ * has ever been sent. Returns the local id.
+ *
+ * The row is written FIRST and in the same transaction as the intent: a row with no intent is
+ * a recipe that never sends, and an intent with no row is a recipe the cook cannot see.
+ */
+export async function queueCreate(store: Store, payload: DraftPayload): Promise<string> {
+  const id = localRecipeId();
+  await store.transaction(async (tx) => {
+    await tx.put("recipes", {
+      id,
+      family_id: payload.family_id,
+      title: payload.title,
+      prep_minutes: payload.prep_minutes,
+      cook_minutes: payload.cook_minutes,
+      visibility: payload.visibility,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    for (const ingredient of payload.ingredients) {
+      await tx.put("recipe_ingredients", {
+        ...ingredient,
+        id: `${id}:${ingredient.position}`,
+        recipe_id: id,
+        optional: ingredient.optional ? 1 : 0,
+      });
+    }
+    for (const step of payload.steps) {
+      await tx.put("recipe_steps", { ...step, id: `${id}:${step.position}`, recipe_id: id });
+    }
+    await enqueue(tx, {
+      id: intentId(),
+      kind: "create",
+      recipeId: id,
+      // Nothing on the server to be stale against. hasMoved reads this as "never conflicts".
+      baseUpdatedAt: null,
+      payload,
+      createdAt: new Date().toISOString(),
+      state: "queued",
+      error: null,
+    });
+  });
+  return id;
 }

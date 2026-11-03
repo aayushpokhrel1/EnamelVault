@@ -72,6 +72,13 @@ export default function Shelf() {
             )}
             {/* Scaffolding, and it says so: __DEV__ is false in a release build, so this is
                 the one way to reach the SQLite contract check without shipping it. */}
+            <Pressable
+              style={({ pressed }) => [styles.add, pressed && styles.pressed]}
+              accessibilityRole="button"
+              onPress={() => router.push("/recipe/new")}
+            >
+              <Text style={styles.addText}>Add a recipe</Text>
+            </Pressable>
             {__DEV__ && (
               <Text
                 style={styles.caughtUp}
@@ -128,4 +135,14 @@ const styles = StyleSheet.create({
   meta: { color: COLORS.inkSoft, fontSize: 15, marginTop: 2 },
   note: { color: COLORS.chipInk, fontSize: 15, fontWeight: "600", marginTop: 6 },
   bad: { color: COLORS.actionDeep, fontSize: 15, fontWeight: "600", marginTop: 6 },
+  add: {
+    alignItems: "center",
+    backgroundColor: COLORS.action,
+    borderRadius: 10,
+    justifyContent: "center",
+    marginBottom: 12,
+    minHeight: 48,
+    padding: 12,
+  },
+  addText: { color: COLORS.onAction, fontSize: 17, fontWeight: "700" },
 });

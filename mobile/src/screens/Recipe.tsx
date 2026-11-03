@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { COLORS } from "../../../src/mobile/theme";
 import type { RecipeView } from "../../../src/mobile/recipe";
 import { recipeView } from "../../../src/mobile/recipe";
+import { useRouter } from "expo-router";
 import { useStore } from "../storeContext";
 
 type Loaded = { state: "loading" } | { state: "missing" } | { state: "ready"; view: RecipeView };
 
 export default function Recipe({ id }: { id: string }) {
   const store = useStore();
+  const router = useRouter();
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
 
   useEffect(() => {
@@ -55,6 +57,22 @@ export default function Recipe({ id }: { id: string }) {
           <Text style={styles.note}>Showing your unsent changes</Text>
         )}
         {view.story !== null && <Text style={styles.story}>{view.story}</Text>}
+        <View style={styles.actions}>
+          <Pressable
+            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+            accessibilityRole="button"
+            onPress={() => router.push(`/recipe/${encodeURIComponent(id)}/cook`)}
+          >
+            <Text style={styles.actionText}>Cook this</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+            accessibilityRole="button"
+            onPress={() => router.push(`/recipe/${encodeURIComponent(id)}/edit`)}
+          >
+            <Text style={styles.secondaryText}>Edit</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.plate}>
@@ -101,4 +119,25 @@ const styles = StyleSheet.create({
   quantity: { color: COLORS.action, fontWeight: "700" },
   step: { flexDirection: "row", gap: 10, marginBottom: 8 },
   stepNumber: { color: COLORS.inkSoft, fontSize: 17, fontWeight: "700", minWidth: 20 },
+  actions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  action: {
+    alignItems: "center",
+    backgroundColor: COLORS.action,
+    borderRadius: 10,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 48,
+    padding: 12,
+  },
+  actionText: { color: COLORS.onAction, fontSize: 17, fontWeight: "700" },
+  secondary: {
+    alignItems: "center",
+    backgroundColor: COLORS.chip,
+    borderRadius: 10,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 20,
+  },
+  secondaryText: { color: COLORS.chipInk, fontSize: 17, fontWeight: "600" },
+  pressed: { opacity: 0.85 },
 });

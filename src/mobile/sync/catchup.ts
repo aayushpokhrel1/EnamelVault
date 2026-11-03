@@ -2,6 +2,8 @@ import type { Row, Store } from "../store/types";
 import type { ServerRecipe } from "./conflict";
 import { isLocalRecipeId, pending } from "./outbox";
 
+export type Family = { id: string; name: string; role: string };
+
 export type PlanItem = { id: string; plan_id: string; recipe_id: string; day: string; meal: string };
 
 /**
@@ -15,6 +17,7 @@ export type PlanItem = { id: string; plan_id: string; recipe_id: string; day: st
  * list of rows, not a quiet return to incremental.
  */
 export type CatchUpRemote = {
+  listFamilies(): Promise<Family[]>;
   listRecipes(): Promise<ServerRecipe[]>;
   listPlanItems(from: string, to: string): Promise<PlanItem[]>;
 };
@@ -48,7 +51,7 @@ export async function lastCaughtUpAt(store: Store): Promise<string | null> {
   return row ? String(row.value) : null;
 }
 
-async function replaceAll(store: Store, table: "meal_plan_items", rows: Row[]) {
+async function replaceAll(store: Store, table: "meal_plan_items" | "families", rows: Row[]) {
   for (const existing of await store.all<Row>(table)) await store.remove(table, existing.id);
   for (const row of rows) await store.put(table, row);
 }
@@ -82,6 +85,7 @@ export async function catchUp(
   now: Date,
 ): Promise<{ pulled: number; dropped: number; at: string }> {
   const queued = new Set((await pending(store)).map((intent) => intent.recipeId));
+  const families = await remote.listFamilies();
   const server = await remote.listRecipes();
   const window = weekWindow(now);
   const planItems = await remote.listPlanItems(window.from, window.to);
@@ -111,6 +115,7 @@ export async function catchUp(
     dropped += 1;
   }
 
+  await replaceAll(store, "families", families);
   await replaceAll(store, "meal_plan_items", planItems);
 
   // Written LAST, and only here: a pull that threw halfway leaves the old timestamp, so the
@@ -118,4 +123,16 @@ export async function catchUp(
   const at = now.toISOString();
   await store.put("meta", { id: LAST_CAUGHT_UP, value: at });
   return { pulled, dropped, at };
+}
+
+/**
+ * The families this account can file a recipe in. Read from the device, so creating a recipe
+ * works with no signal, and pulled rather than derived from the recipes already here: a cook
+ * whose family is new has no recipes to derive it from, and deriving it would mean their
+ * first recipe could only be made online.
+ */
+export async function myFamilies(store: Store): Promise<Family[]> {
+  return (await store.all<Row>("families"))
+    .map((row) => ({ id: row.id, name: String(row.name ?? ""), role: String(row.role ?? "member") }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

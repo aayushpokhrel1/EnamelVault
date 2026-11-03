@@ -6,7 +6,7 @@ import { enqueue } from "./outbox";
 import type { Intent } from "./outbox";
 import type { ServerRecipe } from "./conflict";
 import type { CatchUpRemote } from "./catchup";
-import { catchUp, lastCaughtUpAt, localDate, weekWindow } from "./catchup";
+import { catchUp, lastCaughtUpAt, localDate, myFamilies, weekWindow } from "./catchup";
 
 const recipe = (id: string, overrides: Partial<Recipe> = {}): ServerRecipe => ({
   recipe: {
@@ -36,6 +36,7 @@ const recipe = (id: string, overrides: Partial<Recipe> = {}): ServerRecipe => ({
 });
 
 const remote = (overrides: Partial<CatchUpRemote> = {}): CatchUpRemote => ({
+  listFamilies: async () => [],
   listRecipes: async () => [],
   listPlanItems: async () => [],
   ...overrides,
@@ -103,6 +104,23 @@ describe("catchUp", () => {
     expect(result.pulled).toBe(0);
     expect((await store.get("recipes", "r1"))?.title).toBe("Mine, half typed");
     expect(result.dropped).toBe(0);
+  });
+
+  it("the families are pulled, so a fresh account can create its first recipe offline", async () => {
+    // Derived from the recipes on the device, this would be empty for a cook whose family is
+    // new, and their first recipe could only be made online.
+    await catchUp(
+      store,
+      remote({ listFamilies: async () => [{ id: "family-1", name: "Pokhrel", role: "owner" }] }),
+      NOW,
+    );
+    expect(await myFamilies(store)).toEqual([{ id: "family-1", name: "Pokhrel", role: "owner" }]);
+  });
+
+  it("a family the cook has left is gone from the device", async () => {
+    await store.put("families", { id: "old", name: "Someone else", role: "member" });
+    await catchUp(store, remote(), NOW);
+    expect(await myFamilies(store)).toEqual([]);
   });
 
   it("plan items are replaced, not merged", async () => {
