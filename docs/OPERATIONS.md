@@ -1138,6 +1138,14 @@ the queries are reconstructible from the tables listed above.
   was meant to fix. Reconnecting does not restore the old settings. **Read the config back after
   any reconnect and diff it.** Restoring needs no dashboard: `PATCH
   /accounts/{acct}/builds/workers/{script_tag}` with a full `production_settings` block.
+- **The GitHub repo was renamed `FamilyRecipes` to `EnamelVault` on 2026-11-04, and the
+  Cloudflare Worker was NOT.** The Worker is still `familyrecipes`, and renaming it would drop
+  its four custom domains, so the mismatch is deliberate and permanent. The same goes for the
+  phone app's `familyrecipes://` scheme and its `com.enamelvault.familyrecipes` bundle id,
+  which are registered with Supabase's redirect list and the stores: those names are
+  identifiers, not labels. Workers Builds tracks the repository by id, so the rename does not
+  disconnect it, and GitHub redirects the old URLs. The CI `deployed` job is what would say
+  otherwise, which is the only reason to trust any of this.
 - **Build env vars live on the CONFIG, not the trigger.** A trigger can report
   `environment_variables: {}` while builds it starts resolve both vars correctly, because they
   are read from `production_settings` when the build is queued. Check a queued build's
@@ -1686,7 +1694,7 @@ and they hold nothing the live history does not.
 **What IS exposed: unreachable objects, which GitHub serves until it garbage-collects.**
 
 ```bash
-gh api repos/aayushpokhrel1/FamilyRecipes/commits/e7a329e --jq .sha
+gh api repos/aayushpokhrel1/EnamelVault/commits/e7a329e --jq .sha
 ```
 
 That still returns `e7a329ee57c7...` on a PUBLIC repository, while the object does not exist in
@@ -1731,14 +1739,14 @@ deleted.
 **The standing check**, which is the only thing that resolves this either way:
 
 ```bash
-gh api repos/aayushpokhrel1/FamilyRecipes/commits/e7a329e --jq .sha
+gh api repos/aayushpokhrel1/EnamelVault/commits/e7a329e --jq .sha
 ```
 
 While it returns a SHA, the objects are still being served. A 404 means the collection has
 happened and this whole section can go.
 
 **Forks: 0** as of 2026-10-15
-(`gh api repos/aayushpokhrel1/FamilyRecipes --jq .forks_count`). GC of one repository does not
+(`gh api repos/aayushpokhrel1/EnamelVault --jq .forks_count`). GC of one repository does not
 clear a fork network, so if that number is ever not zero, say so in the ticket.
 
 **When they say it is done**, re-run the `gh api` command above. It must fail with a 404. Until

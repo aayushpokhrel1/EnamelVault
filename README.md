@@ -1,13 +1,25 @@
-# Family Recipes
+# The Enamel Vault
 
-A private, multi-family recipe vault. Families collect, organize, and pass down their recipes
-with photos, story, and provenance. Each recipe carries a visibility flag (Private / Family /
-Public) so an opt-in public recipe feed can grow on top later. A community of food lovers, built
-family-first.
+Recipes kept properly, for families and kitchens. **Two products on one codebase**, one design
+system and one sign-in:
 
-**Live at <https://recipes.enamelvault.com>**, with the pages that explain it at
-<https://enamelvault.com>. The bare domain is the marketing surface and the subdomains are the
-apps; all are served by the same Cloudflare Worker, which branches on hostname.
+- **The family app** (`recipes.enamelvault.com`, plus a phone app): a private, multi-family
+  recipe vault. Families collect, organize, and pass down their recipes with photos, story, and
+  provenance. Each recipe carries a visibility flag (Private / Family / Public), and the public
+  ones surface in Potluck, an opt-in feed with a public page per cook.
+- **The kitchen app** (`kitchen.enamelvault.com`): dish development and sign-off for a
+  professional kitchen. A dish goes from development through trial at one site to the group
+  menu, every revision kept, one version signed off, and an owner can publish the approved
+  version to Potluck under the venue's name.
+
+They **share no data**: the kitchen's tables live in their own Postgres schema, and
+`supabase/kitchen_seal.test.ts` fails if either side reaches into the other. A **moderation
+console** on `admin.enamelvault.com` is the one sanctioned crossing, and even that reads the
+kitchen counts-only through an edge function.
+
+**Live at <https://enamelvault.com>**, which is the marketing surface and the sign-in chooser;
+the subdomains are the apps. All of them are served by the same Cloudflare Worker, which
+branches on hostname.
 
 ## Documentation
 
@@ -25,6 +37,8 @@ comment at that code, where it cannot be missed; the generalisable half lives in
 vault (`Projects/FamilyRecipes/`), which spans every project. See `CLAUDE.md`.
 
 ## What it does
+
+### The family app
 
 - **Multiple families per user**: belong to several, switch between them, and invite people
   with a link you can send rather than a code they have to type.
@@ -55,6 +69,42 @@ vault (`Projects/FamilyRecipes/`), which spans every project. See `CLAUDE.md`.
   Add staples by typing or from the ingredient catalog, and tag an aisle for anything the
   catalog cannot place, from whichever screen you noticed it on.
 - **Sign-in** with a verified email address or with Google.
+
+### The phone app
+
+An Expo / React Native client for the family app, in `mobile/`. It exists for the four things a
+browser tab cannot do: work with no signal, live in the share sheet, ring with the screen off,
+and reach the camera and microphone properly.
+
+- **Offline first**: the shelf, the recipe, and editing all read and write a local SQLite store,
+  with the sync state visible (what is here, what is queued to send, when it last caught up). A
+  queued edit that meets a recipe which moved underneath it gets a conflict screen rather than a
+  silent overwrite.
+- **Cook Mode with timers that ring while the phone is locked**, which is the one thing the
+  web app cannot do.
+- **Sign-in with email, Google and Apple**, against the same Supabase as every other client.
+
+It is a client for the family app only: the kitchen app and the console stay web-only, and
+`supabase/kitchen_seal.test.ts` holds that line for the phone app too.
+
+### The kitchen app
+
+- **The dish pipeline**: development, trial at one site, then the group menu, with every
+  revision kept and one version signed off. An owner can publish the approved version to
+  Potluck under the venue's name.
+- **Reversible housekeeping**: a dish can be retired and a site closed, both undoable, and an
+  owner can erase the whole group, which takes its published dishes down first.
+- **Numbers**: whether dishes land and how long they take, where the group stalls, and which of
+  its sites record anything, for an owner or a chef. An owner alone also sees who has been back,
+  which the kitchen privacy page and terms both disclose.
+
+It is `noindex`, enforced by a `robots.txt` and an `X-Robots-Tag` header rather than a meta tag
+alone, since the crawlers that matter never run the page; `worker/kitchen.ts` carries the
+reason, which changed on 2026-10-15 even though the rule did not. `/professional` on the bare
+domain is therefore the kitchen's only indexable surface.
+
+### Across the products
+
 - **Moderator console** on its own host, `admin.enamelvault.com`, in six sections: the report
   queue, appeals, a **Recipes** section of counts and first-party numbers (who comes back, where
   people fall out of onboarding, which features are used, which marketing page produced an
@@ -77,7 +127,7 @@ vault (`Projects/FamilyRecipes/`), which spans every project. See `CLAUDE.md`.
 
 ## Stack
 
-- React (responsive web now; a React Native app later, sharing the same API).
+- React on the web, and React Native (Expo) on the phone, over the same Supabase.
 - Supabase: Postgres, Auth, Storage, and Row-Level Security enforcing the visibility model.
 - Four Supabase Edge Functions: `extract-recipe` (AI recipe structuring), `delete-account`,
   `notify-report` (emails the moderation queue through Resend), and `admin` (the moderator
@@ -93,14 +143,16 @@ Designed for portability: **all data access is isolated in `src/lib/api/`**, and
 it imports the Supabase client, so moving to a self-owned Node/Express + Postgres backend later
 is a bounded swap.
 
-This repo builds **three apps from one Worker**: the family app (`index.html`, `src/`) on
-`recipes.enamelvault.com`, the professional-kitchen app (`kitchen.html`, `src/kitchen/`,
+This repo builds **three web apps from one Worker**: the family app (`index.html`, `src/`) on
+`recipes.enamelvault.com`, the kitchen app (`kitchen.html`, `src/kitchen/`,
 `src/lib/api/kitchen/`) on `kitchen.enamelvault.com`, and the moderation console
 (`admin.html`, `src/admin/`) on `admin.enamelvault.com`, plus three static marketing pages on
-the bare domain (see below). They share one sign-in, through a cookie on `.enamelvault.com`.
-The family and kitchen apps share tokens, presentational components
-and the auth plumbing, and share NO data: the kitchen's tables live in their own Postgres
-schema and `supabase/kitchen_seal.test.ts` fails if either side reaches into the other.
+the bare domain (see below). The phone app (`mobile/`) is a fourth client, built with Expo and
+shipped through EAS rather than by the Worker. The three web apps share one sign-in, through a
+cookie on `.enamelvault.com`. The family and kitchen apps share tokens, presentational
+components and the auth plumbing, and share NO data: the kitchen's tables live in their own
+Postgres schema and `supabase/kitchen_seal.test.ts` fails if either side reaches into the
+other.
 
 ### The marketing pages on `enamelvault.com`
 
@@ -142,37 +194,23 @@ Full setup, environment variables and the verify commands are in
 
 ## Roadmap
 
-Shipped, newest first: one sign-in across all three hosts, and the moderation console moved
-to its own host with its own door · an audit trail naming the author of every moderator
-action · Cook Mode reading the step aloud · the public documents and the WCAG AA contrast and
-labelling fixes ·
-search-engine indexing (robots, sitemap, canonical, JSON-LD) · moderation, reporting and
+Shipped, newest first: the phone app (an offline shelf and recipe, editing with no signal, a
+conflict screen, and Cook Mode with timers that ring locked) · one sign-in across all three
+hosts, and the moderation console moved to its own host with its own door · an audit trail
+naming the author of every moderator action · Cook Mode reading the step aloud · the public documents and the WCAG AA contrast and
+labelling fixes · the kitchen app (the dish pipeline, Numbers, its own host and its own
+Postgres schema) · search-engine indexing (robots, sitemap, canonical, JSON-LD) · moderation, reporting and
 takedown · save and fork with attribution · Potluck, the public feed (browse, search, follow) · public identity and
 public cook pages · optional ingredients and alternatives · week-grid drag and drop · error
 and uptime monitoring · verified email and Google sign-in · the cupboard and "cook now" ·
 ingredient aisles · My Kitchen week grid · recipe enrichment and grocery scaling · My Kitchen
 meal planning · v1 private multi-family vault.
 
-**Live and offered: the professional-kitchen app.** A dish goes development, trial at
-one site, group menu, with every revision kept, one version signed off, and an owner able to
-publish the approved version to Potluck under the venue's name. A dish can be retired and a
-site closed, both reversible, and an owner can erase the whole group, which takes its published
-dishes down first. **A group can also see how it is doing**: a Numbers page answers whether
-dishes land and how long they take, where the group stalls, and which of its sites record
-anything, for an owner or a chef; an owner alone also sees who has been back, which the kitchen
-privacy page and terms both disclose. It runs on its own host,
-`kitchen.enamelvault.com`, and its own Postgres schema, both live as of 2026-10-12. It is
-offered from the apex through the sign-in chooser and its own page, `/professional`.
-
-It stays `noindex`, enforced by a `robots.txt` and an `X-Robots-Tag` header rather than a meta
-tag alone, since the crawlers that matter never run the page. **The reason changed on
-2026-10-15 even though the rule did not**; `worker/kitchen.ts` carries it.
-
 Next: opening Potluck beyond signed-in users, which moderation and the public documents now
 unblock, and then costs for the kitchen (yield, portion cost, supplier, allergens) in their
 own sidecar table.
 
-Later: LLM / entity canonicalization for ingredients, a family-editable ingredient catalog,
-and a native app. Per-recipe link previews are already built, in the Worker.
+Later: LLM / entity canonicalization for ingredients, and a family-editable ingredient
+catalog. Per-recipe link previews are already built, in the Worker.
 
 `PRODUCT.md` has the detail, including what is deferred and why. It is deliberately not published here.
