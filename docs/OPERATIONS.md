@@ -1449,6 +1449,35 @@ What that means for the forms, in their vocabulary:
 | Usage data, diagnostics | **Not collected.** There is no analytics SDK and no crash reporter in `mobile/`. `src/lib/browserStorage.test.ts` holds the web side of this claim; the phone side is that `mobile/package.json` has no such dependency, which a reader can check in one glance. |
 | Tracking (ATT) | **No.** Nothing is shared with a data broker and nothing is joined with third-party data, so the app does not need the App Tracking Transparency prompt. Adding anything that does makes `Privacy.tsx` part of that change. |
 
+### The dry run, 2026-11-02, and what it found
+
+`npx expo-doctor` passes 20 of 20 and `npx expo config --type public` resolves, so the config
+is valid. **Neither of those looks at a picture**, and the thing that was actually wrong was a
+picture: every file in `mobile/assets` was the unmodified `create-expo-app` template artwork,
+and `app.json` carried that template's pale blue `#E6F4FE` as the Android icon background. The
+app would have reached the App Store wearing Expo's default icon with a green suite.
+
+The icons are now **generated** by `scripts/phone-icons.py` from the mark in
+`public/favicon.svg`, for the same reason `scripts/og-card.py` generates the link-preview
+card: a drawing nobody generates drifts from the product. Rerun it when the mark or the
+palette changes. `scripts/phone-assets.test.ts` holds the two things a generator cannot: that
+no colour outside `src/mobile/theme.ts` reappears in `app.json`, and that `icon.png` has no
+alpha channel, which App Store Connect rejects hours after a build finishes.
+
+**Two things block a build, and both are Aayush's alone:**
+
+1. **`npx eas-cli whoami` says "Not logged in".** `npx eas login` is interactive, so no
+   session can do it.
+2. **`app.json` has no `extra.eas.projectId`**, so the app is not linked to an EAS project.
+   `npx eas init` creates that project on Expo's servers under whoever is logged in. It is
+   left undone on purpose: it is an account-level resource, not a repo change.
+
+**Set `ios.config.usesNonExemptEncryption` before the first submission.** It is absent, so
+App Store Connect asks the export-compliance question on **every** upload. The answer for this
+app is `false` (it uses HTTPS and the platform's own hashing for PKCE, nothing else), but the
+declaration is a legal statement about the person submitting, so it is left for Aayush to make
+rather than written into the repo by a session.
+
 ### Cold start against Safari: NOT YET MEASURED
 
 The plan asks for both numbers in this file, three runs each, and **neither has been taken**:
