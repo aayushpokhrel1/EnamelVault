@@ -1,8 +1,8 @@
-"""Draws the phone app's icons into mobile/assets, from the mark in public/favicon.svg.
+"""Draws every app icon this project ships, from the mark in public/favicon.svg.
 
 Run it when the mark or the palette changes:
 
-    python scripts/phone-icons.py
+    python scripts/app-icons.py
 
 Every icon under mobile/assets was the unmodified create-expo-app template artwork until
 2026-11-02: a pale blue (#E6F4FD) that appears nowhere in DESIGN.md. Nothing failed, because
@@ -22,7 +22,9 @@ from PIL import Image, ImageDraw
 
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "mobile" / "assets"
+ROOT = Path(__file__).resolve().parent.parent
+PHONE = ROOT / "mobile" / "assets"
+WEB = ROOT / "public"
 
 # DESIGN.md tokens, the same three the favicon uses. None is invented here.
 WALL = (31, 59, 52)
@@ -74,7 +76,7 @@ def canvas(size: int, background: tuple | None) -> tuple[Image.Image, ImageDraw.
     return image, ImageDraw.Draw(image)
 
 
-def save(image: Image.Image, size: int, name: str, opaque: bool) -> None:
+def save(image: Image.Image, size: int, name: str, opaque: bool, where: Path = PHONE) -> None:
     out = image.resize((size, size), Image.LANCZOS)
     # iOS rejects an app icon with an alpha channel, and the store rejects it late, after a
     # build has been uploaded. Flatten the ones that must be opaque here rather than finding
@@ -83,8 +85,8 @@ def save(image: Image.Image, size: int, name: str, opaque: bool) -> None:
         flat = Image.new("RGB", out.size, WALL)
         flat.paste(out, mask=out.split()[3])
         out = flat
-    out.save(OUT / name)
-    print(f"{name} {size}x{size} {'RGB' if opaque else 'RGBA'}")
+    out.save(where / name)
+    print(f"{where.name}/{name} {size}x{size} {'RGB' if opaque else 'RGBA'}")
 
 
 def main() -> None:
@@ -119,6 +121,16 @@ def main() -> None:
     image, d = canvas(48, WALL)
     draw_mark(d, 48 * SS, ICON)
     save(image, 48, "favicon.png", opaque=True)
+
+    # The web apps. public/favicon.svg stays hand-drawn: it IS the mark, and its own comment
+    # carries the two rejected alternatives, which a generator would throw away. What is
+    # generated is the raster iOS wants, because an SVG favicon is not used for a home-screen
+    # bookmark: without this file Safari saves a SCREENSHOT OF THE PAGE as the icon.
+    # Adding it to kitchen.html means adding it to SHARED_ASSET in worker/kitchen.ts, which
+    # worker/kitchen.test.ts now derives from the HTML rather than asking anyone to remember.
+    image, d = canvas(180, WALL)
+    draw_mark(d, 180 * SS, ICON)
+    save(image, 180, "apple-touch-icon.png", opaque=True, where=WEB)
 
 
 if __name__ == "__main__":

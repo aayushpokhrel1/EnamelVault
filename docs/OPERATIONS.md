@@ -1457,12 +1457,35 @@ picture: every file in `mobile/assets` was the unmodified `create-expo-app` temp
 and `app.json` carried that template's pale blue `#E6F4FE` as the Android icon background. The
 app would have reached the App Store wearing Expo's default icon with a green suite.
 
-The icons are now **generated** by `scripts/phone-icons.py` from the mark in
+The icons are now **generated** by `scripts/app-icons.py` from the mark in
 `public/favicon.svg`, for the same reason `scripts/og-card.py` generates the link-preview
 card: a drawing nobody generates drifts from the product. Rerun it when the mark or the
-palette changes. `scripts/phone-assets.test.ts` holds the two things a generator cannot: that
+palette changes. `scripts/app-assets.test.ts` holds the two things a generator cannot: that
 no colour outside `src/mobile/theme.ts` reappears in `app.json`, and that `icon.png` has no
 alpha channel, which App Store Connect rejects hours after a build finishes.
+
+**The same sweep over the web apps, 2026-11-04: no template artwork survives there.**
+`public/favicon.svg` IS the mark and stays hand-drawn, because its own comment carries the two
+rejected alternatives a generator would throw away; `public/og.png` is generated and matches
+it, and `OG_CARD` in `worker/meta.ts` agrees with the `og:image` in both `index.html` and
+`kitchen.html` at `?v=2`. The kitchen serving the family's card is deliberate and its trigger
+to change is written at the tag.
+
+One real gap was there, and it was an absence rather than a drift: there was no
+`apple-touch-icon`, so iOS saved a SCREENSHOT OF THE PAGE as the home-screen icon for anyone
+who bookmarked either app. `scripts/app-icons.py` now draws `public/apple-touch-icon.png` too.
+**Adding it to `kitchen.html` required adding it to `SHARED_ASSET` in `worker/kitchen.ts`**,
+an anchored allowlist whose comment asked people to remember; `scripts/app-assets.test.ts` now
+derives the question from the HTML instead, so the next `<link>` cannot be forgotten. **It
+lives there and not beside the worker's own tests because `worker/tsconfig` has no node
+types on purpose**: a test there that reads a file passes under vitest and fails `npx tsc -b`,
+which is exactly how it was first written. That
+guard found `/src/kitchen/main.tsx` on its first run, which is the Vite source entry and is
+excluded on purpose, since the build replaces it with the hashed bundle.
+
+**There is still no web manifest, and that is not an oversight to fix quietly:** shipping one
+makes the site installable and puts it in competition with the phone app for the same home
+screen. It is a product call, so it is recorded here as absent rather than decided.
 
 **Two things block a build, and both are Aayush's alone:**
 

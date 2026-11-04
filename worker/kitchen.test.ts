@@ -20,6 +20,7 @@ describe("the kitchen host", () => {
     expect(isSharedAsset("/assets/kitchen-a1b2c3.js")).toBe(true);
     expect(isSharedAsset("/assets/index-d4e5f6.css")).toBe(true);
     expect(isSharedAsset("/favicon.svg")).toBe(true);
+    expect(isSharedAsset("/apple-touch-icon.png")).toBe(true);
     expect(isSharedAsset("/fonts/zilla-slab-700-latin.woff2")).toBe(true);
     expect(isSharedAsset("/theme-init.js")).toBe(true);
     // Routes of the app, which must fall through to the shell instead.

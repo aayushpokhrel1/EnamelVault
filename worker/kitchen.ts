@@ -26,7 +26,7 @@ export function isKitchenHost(hostname: string): boolean {
  *
  * An allowlist, anchored, and it must stay one. ADD A FILE TO kitchen.html? Add it here.
  */
-const SHARED_ASSET = /^\/(assets\/[A-Za-z0-9._-]+|favicon\.svg|og\.png|theme-init\.js|fonts\/[a-z0-9-]+\.woff2)$/;
+const SHARED_ASSET = /^\/(assets\/[A-Za-z0-9._-]+|favicon\.svg|apple-touch-icon\.png|og\.png|theme-init\.js|fonts\/[a-z0-9-]+\.woff2)$/;
 
 export function isSharedAsset(pathname: string): boolean {
   return SHARED_ASSET.test(pathname);
