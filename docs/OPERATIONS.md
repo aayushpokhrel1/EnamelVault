@@ -1153,6 +1153,14 @@ the queries are reconstructible from the tables listed above.
   shape, the org then the app, and a kitchen app would be `com.enamelvault.kitchen`. Enamel
   Vault is the umbrella; Family Recipes is one product under it. The phone app's scheme and
   bundle id follow the product, not the repository.
+- **`supabase stop` reads `project_id` from `config.toml`, so it can only stop the project that
+  file names right now.** `project_id` became `EnamelVault` on 2026-11-04 while the
+  `FamilyRecipes` stack was still running, so `stop` looked for a project that had never
+  started, stopped nothing, and the next `start` died on `Bind for 0.0.0.0:54322 failed: port
+  is already allocated`, which names the port and not the cause. Stop the old stack by
+  container name instead: `docker stop $(docker ps -q --filter name=_FamilyRecipes)`. Its
+  volumes survive that, so the old local data is still recoverable by flipping `project_id`
+  back. **Renaming `project_id` means: stop, then rename, then start.**
 - **Build env vars live on the CONFIG, not the trigger.** A trigger can report
   `environment_variables: {}` while builds it starts resolve both vars correctly, because they
   are read from `production_settings` when the build is queued. Check a queued build's
