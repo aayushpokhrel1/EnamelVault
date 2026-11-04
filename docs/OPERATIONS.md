@@ -56,7 +56,7 @@ directory, and two of its own tests prove it can go red. Before 2026-09-30 a com
 if you add another edge function, give it the same test rather than trusting the deploy.
 
 **The local edge runtime does not come up on this machine, so an edge function cannot be
-EXERCISED locally at all.** `supabase start` reports `supabase_edge_runtime_FamilyRecipes`
+EXERCISED locally at all.** `supabase start` reports `supabase_edge_runtime_EnamelVault`
 under "Stopped services" on every run, even though `config.toml` has `[edge_runtime] enabled
 = true`, and `functions.invoke` from a test answers 503 through Kong. So an integration test
 must not try to call one: it will fail for an environment reason that looks exactly like a
@@ -1139,13 +1139,20 @@ the queries are reconstructible from the tables listed above.
   any reconnect and diff it.** Restoring needs no dashboard: `PATCH
   /accounts/{acct}/builds/workers/{script_tag}` with a full `production_settings` block.
 - **The GitHub repo was renamed `FamilyRecipes` to `EnamelVault` on 2026-11-04, and the
-  Cloudflare Worker was NOT.** The Worker is still `familyrecipes`, and renaming it would drop
-  its four custom domains, so the mismatch is deliberate and permanent. The same goes for the
-  phone app's `familyrecipes://` scheme and its `com.enamelvault.familyrecipes` bundle id,
-  which are registered with Supabase's redirect list and the stores: those names are
-  identifiers, not labels. Workers Builds tracks the repository by id, so the rename does not
-  disconnect it, and GitHub redirects the old URLs. The CI `deployed` job is what would say
-  otherwise, which is the only reason to trust any of this.
+  Cloudflare Worker was NOT.** The Worker is still `familyrecipes` even though it serves all
+  three apps, so it is the one genuinely misnamed thing here, and it stays that way: Cloudflare
+  has no rename for a Worker, so correcting it means a new Worker, re-attaching four custom
+  domains, and reconnecting Workers Builds, which deletes the build configuration (above).
+  A cosmetic name is not worth a deploy outage. Workers Builds tracks the repository by id, so
+  the rename did not disconnect it, and GitHub redirects the old URLs; the CI `deployed` job is
+  what would say otherwise, which is the only reason to trust any of this.
+- **`familyrecipes://` and `com.enamelvault.familyrecipes` are NOT leftovers from the old repo
+  name, so do not "tidy" them.** The family app is still the product called Family Recipes:
+  `src/pages/Terms.tsx`, `Privacy.tsx`, `Help.tsx` and the kitchen's own terms all name it, and
+  the terms gate holds that wording. `com.enamelvault.familyrecipes` is already the right
+  shape, the org then the app, and a kitchen app would be `com.enamelvault.kitchen`. Enamel
+  Vault is the umbrella; Family Recipes is one product under it. The phone app's scheme and
+  bundle id follow the product, not the repository.
 - **Build env vars live on the CONFIG, not the trigger.** A trigger can report
   `environment_variables: {}` while builds it starts resolve both vars correctly, because they
   are read from `production_settings` when the build is queued. Check a queued build's
